@@ -4,7 +4,23 @@ Web-App zum Planen des eigenen Gartens: Grundstück aus dem amtlichen Kataster (
 
 ## Starten
 
-`index.html` doppelklicken. Sie öffnet sich im Browser (Chrome, Edge, Firefox, Safari). Eine Installation ist nicht nötig, aber eine Internetverbindung (Karten, Kataster, Bibliotheken).
+- **Am Computer:** `index.html` doppelklicken. Sie öffnet sich im Browser.
+- **Auf dem Handy:** Die App muss über eine https-Adresse erreichbar sein (z. B. GitHub Pages). Dann im Browser öffnen und
+  - iPhone (Safari): Teilen → „Zum Home-Bildschirm“
+  - Android (Chrome): ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“
+
+  Danach startet sie wie eine App im Vollbild. Die App-Dateien und das Luftbild des Plans werden zwischengespeichert, deshalb lässt sich der Plan auch bei schlechtem Netz im Garten öffnen.
+
+Für Karte, Kataster und Adresssuche braucht es Internet.
+
+## Bedienung auf dem Handy
+
+- Unten liegt die Werkzeugleiste. Darüber ist ein Feld, das man auf- und zuklappen kann: Eigenschaften, Katalog und Übersicht.
+- **Antippen** wählt aus. Ein **ausgewähltes** Element verschiebt man mit dem Finger. Wischt man auf freier Fläche, verschiebt sich die Ansicht. Mit **zwei Fingern** wird gezoomt.
+- **Zeichnen:** Punkte antippen, dann „✓ Fertig“ (oder „↶ Punkt“ / „✕“).
+- **Punkt löschen:** Punkt antippen, dann im unteren Feld auf „Punkt löschen“.
+- **◎ Standort:** Zeigt deine GPS-Position im Plan. Mit „An meinem Standort setzen“ trägst du Bäume und Objekte direkt im Garten ein (Genauigkeit meist 3–10 m).
+- Öffnen, Speichern, Bild und Einstellungen findest du im Menü ⋯.
 
 ## Ablauf
 

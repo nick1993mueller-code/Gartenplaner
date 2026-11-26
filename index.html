@@ -2,7 +2,15 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#3f7d3a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Gartenplaner">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>Gartenplaner</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -74,7 +82,6 @@ main{position:absolute;top:52px;left:0;right:0;bottom:0}
 #plan.c-pan{cursor:grab}
 .floating{position:absolute;background:rgba(255,255,255,.95);border:1px solid var(--line);border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.08);font-size:12px}
 #layerBox{left:10px;top:10px;padding:8px 10px;display:flex;flex-direction:column;gap:5px}
-#layerBox label{display:flex;align-items:center;gap:6px;white-space:nowrap}
 #hintBox{left:50%;transform:translateX(-50%);bottom:12px;padding:7px 12px;max-width:90%;text-align:center}
 #hintBox:empty{display:none}
 #zoomBox{right:10px;bottom:12px;display:flex;flex-direction:column}
@@ -108,15 +115,77 @@ main{position:absolute;top:52px;left:0;right:0;bottom:0}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1f2a1f;color:#fff;padding:9px 14px;border-radius:9px;font-size:13px;z-index:6000;opacity:0;transition:opacity .25s;pointer-events:none}
 .toast.show{opacity:1}
 .leaflet-container{font:inherit}
+/* Ebenen / Zeichenleiste / Menü */
+.layer-toggle{border:0;background:transparent;font-weight:600;padding:2px 0;font-size:12px;text-align:left}
+.layer-items,.v3body{display:flex;flex-direction:column;gap:5px}
+.v3body{gap:8px}
+#layerBox.collapsed .layer-items,#v3ctrl.collapsed .v3body{display:none}
+#layerBox label{display:flex;align-items:center;gap:6px;white-space:nowrap}
+#drawBar{left:50%;transform:translateX(-50%);top:10px;display:none;gap:6px;padding:6px;align-items:center;z-index:5}
+#drawBar.show{display:flex}
+#drawBar span{color:var(--muted);padding:0 4px;white-space:nowrap}
+#drawBar button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 12px;font-weight:600;font-size:14px;white-space:nowrap}
+#drawBar button.ok{background:var(--accent);color:#fff;border-color:var(--accent)}
+#zGps.on{color:#1a73e8}
+#plan .h-vtx.active{fill:#ff8a00}
+.sheet-handle{display:none}
+#propsBody{display:flex;flex-direction:column;gap:12px}
+.hbtn.more{display:none}
+.tab .lbl-s,#v3help .touch{display:none}
+@media (pointer:coarse){ #v3help .desk{display:none} #v3help .touch{display:inline} }
+.menu{position:fixed;top:54px;right:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.15);display:none;flex-direction:column;z-index:4500;min-width:220px;padding:5px}
+.menu.open{display:flex}
+.menu button{border:0;background:transparent;text-align:left;padding:12px;border-radius:8px;font-size:15px}
+.menu button:hover{background:var(--bg)}
+body{height:100dvh}
+
+/* ===== Handy ===== */
 @media (max-width:820px){
-  .tab span.lbl{display:none}
-  .hbtn span.lbl{display:none}
-  .side{position:absolute;right:0;bottom:0;top:auto;width:100%;max-height:45%;border-left:0;border-top:1px solid var(--line);z-index:900}
-  #map{height:55%}
-  .view.active#view-map{flex-direction:column}
-  .props{position:absolute;right:0;bottom:0;width:100%;max-height:40%;z-index:20;border-left:0;border-top:1px solid var(--line)}
-  .props.collapsed{display:none}
-  #layerBox{font-size:11px}
+  header{gap:4px;padding:0 6px}
+  .brand span{display:none}
+  .tabs{margin-left:2px;gap:2px;flex:1}
+  .tab{padding:8px 9px;font-size:14px}
+  .tab .num,.tab .lbl{display:none}
+  .tab .lbl-s{display:inline}
+  .spacer{display:none}
+  #btnOpen,#btnSave,#btnSettings{display:none}
+  .hbtn.more{display:inline-block}
+  .hbtn{padding:6px 10px;font-size:16px}
+  /* Karte */
+  #view-map.active{flex-direction:column}
+  #map{flex:1 1 auto;height:auto;min-height:0}
+  .side{position:static;width:100%;max-width:none;flex:0 0 auto;max-height:46%;border-left:0;border-top:1px solid var(--line);padding:12px 14px calc(12px + env(safe-area-inset-bottom));gap:10px}
+  .side .intro{display:none}
+  /* Plan */
+  #view-plan.active{flex-direction:column}
+  #planWrap{order:1;flex:1 1 auto;min-height:0}
+  .props{order:2;position:static;width:100%;flex:0 0 auto;max-height:44%;border-left:0;border-top:1px solid var(--line);padding:0 14px 12px;gap:10px;z-index:3}
+  .props.collapsed{padding-bottom:0}
+  .props.collapsed #propsBody{display:none}
+  #propsBody>h3:first-child{display:none}
+  .sheet-handle{display:flex;align-items:center;gap:8px;width:100%;border:0;background:var(--panel);padding:14px 0 8px;font-weight:600;font-size:14px;position:sticky;top:0;z-index:2}
+  .sheet-handle::before{content:"";position:absolute;left:50%;top:5px;width:38px;height:4px;border-radius:2px;background:#cfd4ca;transform:translateX(-50%)}
+  .sheet-handle .chev{margin-left:auto;color:var(--muted)}
+  .toolbar{order:3;width:100%;flex:0 0 auto;flex-direction:row;border-right:0;border-top:1px solid var(--line);padding:4px 6px calc(4px + env(safe-area-inset-bottom));overflow-x:auto;overflow-y:hidden;gap:2px}
+  .tool{flex:0 0 auto;width:60px;height:50px}
+  .tsep{width:1px;height:32px;margin:0 4px;align-self:center}
+  .catalog{display:flex;overflow-x:auto;gap:6px;padding-bottom:4px}
+  .catalog button{flex:0 0 76px}
+  .catalog button svg{width:42px;height:42px}
+  #zIn,#zOut{display:none}
+  #zoomBox{bottom:10px;right:8px}
+  #zoomBox button{width:42px;height:42px}
+  #scaleBar{bottom:10px;left:8px}
+  #hintBox{bottom:auto;top:10px;left:auto;right:56px;transform:none;max-width:calc(100% - 170px);font-size:11px;padding:6px 8px;text-align:left}
+  #drawBar{top:auto;bottom:10px}
+  #drawBar span{display:none}
+  #planWrap.drawing #scaleBar,#planWrap.drawing #zoomBox{display:none}
+  #layerBox{left:8px;top:8px}
+  .field input,.field select{font-size:16px}
+  /* 3D */
+  #v3ctrl{left:8px;top:8px;padding:8px 10px;min-width:0}
+  #v3ctrl:not(.collapsed){right:8px}
+  #v3help{right:8px;bottom:8px;font-size:11px}
 }
 </style>
 </head>
@@ -127,9 +196,9 @@ main{position:absolute;top:52px;left:0;right:0;bottom:0}
     <span>Gartenplaner</span>
   </div>
   <nav class="tabs">
-    <button class="tab active" data-view="map">1 <span class="lbl">Grundstück</span></button>
-    <button class="tab" data-view="plan" disabled>2 <span class="lbl">Plan 2D</span></button>
-    <button class="tab" data-view="3d" disabled>3 <span class="lbl">Ansicht 3D</span></button>
+    <button class="tab active" data-view="map"><span class="num">1</span> <span class="lbl">Grundstück</span><span class="lbl-s">Karte</span></button>
+    <button class="tab" data-view="plan" disabled><span class="num">2</span> <span class="lbl">Plan 2D</span><span class="lbl-s">Plan</span></button>
+    <button class="tab" data-view="3d" disabled><span class="num">3</span> <span class="lbl">Ansicht 3D</span><span class="lbl-s">3D</span></button>
   </nav>
   <div class="spacer"></div>
   <button class="hbtn" id="btnUndo" title="Rückgängig (Strg+Z)">↶</button>
@@ -137,6 +206,7 @@ main{position:absolute;top:52px;left:0;right:0;bottom:0}
   <button class="hbtn" id="btnOpen" title="Projektdatei öffnen">📂 <span class="lbl">Öffnen</span></button>
   <button class="hbtn" id="btnSave" title="Projektdatei speichern">💾 <span class="lbl">Speichern</span></button>
   <button class="hbtn" id="btnSettings" title="Einstellungen">⚙︎</button>
+  <button class="hbtn more" id="btnMore" title="Menü">⋯</button>
   <input type="file" id="fileInput" accept=".json,.garten.json,application/json" hidden>
 </header>
 
@@ -147,7 +217,7 @@ main{position:absolute;top:52px;left:0;right:0;bottom:0}
     <aside class="side">
       <div>
         <h2>Grundstück finden</h2>
-        <p class="hint">Suche eine Adresse oder ein Flurstück und klicke dann in der Karte auf dein Grundstück. Die Grenzen kommen direkt aus dem amtlichen Liegenschaftskataster (ALKIS Sachsen). Mehrere Flurstücke kannst du nacheinander anklicken.</p>
+        <p class="hint intro">Suche eine Adresse oder ein Flurstück und klicke dann in der Karte auf dein Grundstück. Die Grenzen kommen direkt aus dem amtlichen Liegenschaftskataster (ALKIS Sachsen). Mehrere Flurstücke kannst du nacheinander anklicken.</p>
       </div>
       <div class="seg" id="searchMode">
         <button class="active" data-mode="addr">Adresse</button>
@@ -181,6 +251,8 @@ main{position:absolute;top:52px;left:0;right:0;bottom:0}
     <div id="planWrap">
       <svg id="plan" xmlns="http://www.w3.org/2000/svg"></svg>
       <div class="floating" id="layerBox">
+        <button class="layer-toggle" id="layerToggle">☰ Ebenen</button>
+        <div class="layer-items">
         <label><input type="checkbox" id="lyAerial" checked> Luftbild</label>
         <input type="range" id="lyAerialOp" min="0" max="1" step="0.05" value="0.85" title="Deckkraft Luftbild">
         <label><input type="checkbox" id="lyParcel" checked> Grundstücksgrenze</label>
@@ -188,22 +260,35 @@ main{position:absolute;top:52px;left:0;right:0;bottom:0}
         <label><input type="checkbox" id="lyGrid"> Raster 1 m</label>
         <label><input type="checkbox" id="lyLabels" checked> Beschriftung</label>
         <label><input type="checkbox" id="lySnap" checked> Einrasten</label>
+        </div>
+      </div>
+      <div class="floating" id="drawBar">
+        <span id="dbInfo"></span>
+        <button id="dbUndo" title="Letzten Punkt entfernen">↶ Punkt</button>
+        <button id="dbCancel" title="Abbrechen">✕</button>
+        <button id="dbOk" class="ok">✓ Fertig</button>
       </div>
       <div class="floating" id="scaleBar"></div>
       <div class="floating" id="zoomBox">
         <button id="zIn" title="Hineinzoomen">+</button>
         <button id="zOut" title="Herauszoomen">−</button>
         <button id="zFit" title="Ganzes Grundstück" style="font-size:14px">⤢</button>
+        <button id="zGps" title="Mein Standort (GPS)" style="font-size:16px">◎</button>
       </div>
       <div class="floating" id="hintBox"></div>
     </div>
-    <aside class="props" id="props"></aside>
+    <aside class="props" id="props">
+      <button class="sheet-handle" id="sheetHandle"><span id="sheetTitle"></span><span class="chev" id="sheetChev">▾</span></button>
+      <div id="propsBody"></div>
+    </aside>
   </section>
 
   <!-- ============ 3: 3D ============ -->
   <section class="view" id="view-3d">
     <div id="v3wrap">
       <div class="floating" id="v3ctrl">
+        <button class="layer-toggle" id="v3toggle">☰ Optionen</button>
+        <div class="v3body">
         <label>Boden
           <select id="v3ground" style="margin-left:auto">
             <option value="aerial">Luftbild</option>
@@ -218,8 +303,9 @@ main{position:absolute;top:52px;left:0;right:0;bottom:0}
           <button class="btn secondary" id="v3persp">Schräg</button>
           <button class="btn secondary" id="v3png">Bild ⤓</button>
         </div>
+        </div>
       </div>
-      <div class="floating" id="v3help">Linke Maustaste: drehen · Rechte: verschieben · Rad: zoomen</div>
+      <div class="floating" id="v3help"><span class="desk">Linke Maustaste: drehen · Rechte: verschieben · Rad: zoomen</span><span class="touch">1 Finger: drehen · 2 Finger: zoomen &amp; verschieben</span></div>
     </div>
   </section>
 </main>
@@ -239,6 +325,12 @@ main{position:absolute;top:52px;left:0;right:0;bottom:0}
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<div class="menu" id="moreMenu">
+  <button data-act="open">📂 Projekt öffnen</button>
+  <button data-act="save">💾 Projekt speichern</button>
+  <button data-act="png">🖼 Plan als Bild</button>
+  <button data-act="settings">⚙︎ Einstellungen</button>
+</div>
 
 <script type="module">
 import * as THREE from 'three';
@@ -464,6 +556,20 @@ lyDOP.addTo(map); lyFlst.addTo(map);
 const baseLayers={ 'Luftbild Sachsen (20 cm)':lyDOP, 'Esri Satellit':lyEsri, 'Karte (OSM)':lyOSM };
 const layerCtl = L.control.layers(baseLayers,{ 'Flurstücksgrenzen':lyFlst },{ position:'topleft' }).addTo(map);
 const selLayer = L.layerGroup().addTo(map);
+// Standort-Knopf (praktisch auf dem Handy)
+const locLayer = L.layerGroup().addTo(map);
+const locCtl = L.control({ position:'topleft' });
+locCtl.onAdd = ()=>{
+  const d=L.DomUtil.create('div','leaflet-bar leaflet-control');
+  d.innerHTML='<a href="#" title="Mein Standort" role="button" style="font-size:18px;line-height:30px">◎</a>';
+  L.DomEvent.disableClickPropagation(d);
+  d.querySelector('a').onclick=ev=>{ ev.preventDefault(); setStatus('Suche Standort …'); map.locate({ setView:true, maxZoom:19, enableHighAccuracy:true }); };
+  return d;
+};
+locCtl.addTo(map);
+map.on('locationfound', e=>{ locLayer.clearLayers(); L.circle(e.latlng,{ radius:e.accuracy, weight:1, color:'#1a73e8', fillOpacity:.1 }).addTo(locLayer);
+  L.circleMarker(e.latlng,{ radius:7, color:'#fff', weight:2.5, fillColor:'#1a73e8', fillOpacity:1 }).addTo(locLayer); setStatus('Tippe jetzt auf dein Flurstück.'); });
+map.on('locationerror', e=>setStatus('Standort nicht verfügbar: '+e.message, true));
 let selected = []; // {id, props, polys}
 let googleLayer=null;
 
@@ -610,7 +716,7 @@ let tool='select';
 let placing=null;        // Katalog-Schlüssel für Pflanze/Objekt
 let drawing=null;        // {type, pts:[], ...}
 let cursor=null;         // aktueller Mauspunkt (Welt)
-const sel={ id:null };
+const sel={ id:null, vtx:null };
 const prefs={ pathMat:'pflaster', pathW:1.0, areaMat:'rasen', lineKind:'hecke', plant:'strauch', object:'gartenhaus' };
 
 const ICONS = {
@@ -638,6 +744,8 @@ function setTool(t){
   if(drawing) finishDrawing(false);
   tool=t; placing = t==='plant'?prefs.plant : t==='object'?prefs.object : null;
   if(t!=='select') sel.id=null;
+  sel.vtx=null;
+  if(isMobile()){ if(t==='select') closeSheet(); else openSheet(); }
   measure=null;
   buildToolbar(); renderAll();
 }
@@ -665,7 +773,7 @@ function defsMarkup(){
 /* ---------- Rendern ---------- */
 let planW=800, planH=600;
 function resizePlan(){ const r=$('#planWrap').getBoundingClientRect(); planW=r.width||800; planH=r.height||600; }
-window.addEventListener('resize',()=>{ if(currentView==='plan'){ resizePlan(); renderAll(); } if(currentView==='3d') resize3D(); });
+window.addEventListener('resize',()=>{ if(currentView==='3d') resize3D(); });
 function fitPlan(){
   resizePlan();
   const pts=[]; for(const p of state.parcels) for(const rings of p.polys) pts.push(rings[0]);
@@ -775,8 +883,8 @@ function itemMarkup(it){
   if(it.type==='line'){
     const k=LINE_KINDS[it.kind]||LINE_KINDS.hecke; const pts=ptsAttr(it.pts);
     if(it.kind==='hecke') return `<g data-id="${it.id}" filter="url(#shadowL)"><polyline points="${pts}" fill="none" stroke="#3b6a2a" stroke-width="${it.w+px(2)}" stroke-linejoin="round" stroke-linecap="round"/><polyline points="${pts}" fill="none" stroke="url(#p-hecke)" stroke-width="${it.w}" stroke-linejoin="round" stroke-linecap="round"/></g>`;
-    if(it.kind==='zaun') return `<g data-id="${it.id}"><polyline points="${pts}" fill="none" stroke="transparent" stroke-width="${Math.max(it.w,px(10))}"/><polyline points="${pts}" fill="none" stroke="${it.color||k.color}" stroke-width="${Math.max(it.w,px(2))}" stroke-linejoin="round"/><polyline points="${pts}" fill="none" stroke="${it.color||k.color}" stroke-width="${Math.max(it.w*3,px(6))}" stroke-dasharray="${px(3)} 2" /></g>`;
-    return `<g data-id="${it.id}"><polyline points="${pts}" fill="none" stroke="transparent" stroke-width="${Math.max(it.w,px(10))}"/><polyline points="${pts}" fill="none" stroke="${shade(it.color||k.color,0.7)}" stroke-width="${it.w+px(1.5)}" stroke-linejoin="miter"/><polyline points="${pts}" fill="none" stroke="${it.color||k.color}" stroke-width="${it.w}" stroke-linejoin="miter"/></g>`;
+    if(it.kind==='zaun') return `<g data-id="${it.id}"><polyline points="${pts}" fill="none" stroke="transparent" stroke-width="${Math.max(it.w,px(10*HR()))}"/><polyline points="${pts}" fill="none" stroke="${it.color||k.color}" stroke-width="${Math.max(it.w,px(2))}" stroke-linejoin="round"/><polyline points="${pts}" fill="none" stroke="${it.color||k.color}" stroke-width="${Math.max(it.w*3,px(6))}" stroke-dasharray="${px(3)} 2" /></g>`;
+    return `<g data-id="${it.id}"><polyline points="${pts}" fill="none" stroke="transparent" stroke-width="${Math.max(it.w,px(10*HR()))}"/><polyline points="${pts}" fill="none" stroke="${shade(it.color||k.color,0.7)}" stroke-width="${it.w+px(1.5)}" stroke-linejoin="miter"/><polyline points="${pts}" fill="none" stroke="${it.color||k.color}" stroke-width="${it.w}" stroke-linejoin="miter"/></g>`;
   }
   if(it.type==='plant'){
     const cat=PLANTS[it.kind]||PLANTS.strauch;
@@ -793,20 +901,38 @@ function itemMarkup(it){
   return '';
 }
 
-function renderAll(){
-  if(!state.origin){ svg.innerHTML=''; renderProps(); return; }
-  const T=`translate(${tx().toFixed(2)} ${ty().toFixed(2)}) scale(${cam.s})`;
-  let h=defsMarkup();
-  h+=`<style>.lbl{fill:#1f2a1f;paint-order:stroke;stroke:#fff;stroke-width:${px(3)};font-family:system-ui,sans-serif;font-weight:600;pointer-events:none}</style>`;
-  h+=`<g transform="${T}">`;
+// Gerüst einmal anlegen; danach werden nur Transformation (Verschieben/Zoomen) bzw. Inhalt erneuert
+let skel=null;
+function ensureSkeleton(){
+  if(skel && svg.contains(skel.world)) return;
+  svg.innerHTML = defsMarkup() +
+    `<g id="world"><image id="aerImg" preserveAspectRatio="none"/><g id="content"></g></g>`+
+    `<g id="north"><circle r="17" fill="#fff" fill-opacity=".92" stroke="#ccc"/><path d="M0 -12L5 6L0 2L-5 6Z" fill="#1f2a1f"/><text y="14" font-size="8" text-anchor="middle" font-weight="700" fill="#1f2a1f">N</text></g>`;
+  skel={ world:svg.querySelector('#world'), img:svg.querySelector('#aerImg'), content:svg.querySelector('#content'), north:svg.querySelector('#north'), href:null };
+}
+// nur Ansicht (Verschieben, Pinch) – schnell
+function renderView(){
+  if(!state.origin) return;
+  ensureSkeleton();
+  skel.world.setAttribute('transform',`translate(${tx().toFixed(2)} ${ty().toFixed(2)}) scale(${cam.s})`);
+  skel.north.setAttribute('transform',`translate(${planW-36} 34)`);
+  renderScale();
+}
+// withProps=false: Eigenschaften-Panel nicht neu aufbauen (bei Mausbewegung / Ziehen)
+function renderAll(withProps=true){
+  if(!state.origin){ svg.innerHTML=''; skel=null; renderProps(); return; }
+  renderView();
   // Luftbild
-  if(state.aerial && $('#lyAerial').checked){
-    const a=state.aerial;
-    h+=`<image href="${esc(aerialUrl())}" x="${a.x0}" y="${a.y0}" width="${a.x1-a.x0}" height="${a.y1-a.y0}" preserveAspectRatio="none" opacity="${$('#lyAerialOp').value}"/>`;
-  }
+  const a=state.aerial, img=skel.img;
+  if(a && $('#lyAerial').checked){
+    const href=aerialUrl();
+    if(skel.href!==href){ img.setAttribute('href',href); skel.href=href; img.setAttribute('x',a.x0); img.setAttribute('y',a.y0); img.setAttribute('width',a.x1-a.x0); img.setAttribute('height',a.y1-a.y0); }
+    img.setAttribute('opacity',$('#lyAerialOp').value); img.style.display='';
+  } else img.style.display='none';
+  let h=`<style>.lbl{fill:#1f2a1f;paint-order:stroke;stroke:#fff;stroke-width:${px(3)};font-family:system-ui,sans-serif;font-weight:600;pointer-events:none}</style>`;
   // Raster
-  if($('#lyGrid').checked && state.aerial){
-    const a=state.aerial; let d='';
+  if($('#lyGrid').checked && a){
+    let d='';
     for(let x=Math.ceil(a.x0);x<=a.x1;x++) d+=`M${x} ${a.y0}V${a.y1}`;
     for(let y=Math.ceil(a.y0);y<=a.y1;y++) d+=`M${a.x0} ${y}H${a.x1}`;
     h+=`<path d="${d}" stroke="#fff" stroke-opacity=".35" stroke-width="${px(1)}"/>`;
@@ -822,37 +948,39 @@ function renderAll(){
   if($('#lyParcel').checked) for(const p of state.parcels) for(const rings of p.polys){
     h+=`<path d="${rings.map(ringPath).join('')}" fill="none" stroke="#fff" stroke-width="${px(4)}" stroke-linejoin="round" pointer-events="none"/>`;
     h+=`<path d="${rings.map(ringPath).join('')}" fill="none" stroke="#e0362b" stroke-width="${px(2)}" stroke-dasharray="${px(10)} ${px(4)} ${px(2)} ${px(4)}" stroke-linejoin="round" pointer-events="none"/>`;
-    // Grenzlängen
     if($('#lyLabels').checked && cam.s>6){ const r=rings[0]; for(let i=0;i<r.length;i++){ const a=r[i], b=r[(i+1)%r.length]; const L=Math.hypot(b[0]-a[0],b[1]-a[1]); if(L*cam.s<60) continue;
       let ang=Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI; if(ang>90) ang-=180; if(ang<-90) ang+=180;
       h+=`<text transform="translate(${((a[0]+b[0])/2).toFixed(2)} ${((a[1]+b[1])/2).toFixed(2)}) rotate(${ang.toFixed(1)})" y="${-px(6)}" font-size="${px(10.5)}" text-anchor="middle" class="lbl" style="fill:#b3261e">${fmt(L,2)} m</text>`; } }
   }
   h+=overlayMarkup();
-  h+='</g>';
-  // Nordpfeil
-  h+=`<g transform="translate(${planW-36} 34)"><circle r="17" fill="#fff" fill-opacity=".92" stroke="#ccc"/><path d="M0 -12L5 6L0 2L-5 6Z" fill="#1f2a1f"/><text y="-1" dy="-13" font-size="0" >N</text><text y="16" font-size="8" text-anchor="middle" font-weight="700" fill="#1f2a1f" dy="-2">N</text></g>`;
-  svg.innerHTML=h;
+  skel.content.innerHTML=h;
   svg.classList.toggle('c-draw', tool!=='select');
-  renderScale(); renderHint(); renderProps();
+  $('#drawBar').classList.toggle('show', !!drawing); $('#planWrap').classList.toggle('drawing', !!drawing);
+  if(drawing) $('#dbInfo').textContent = `${drawing.pts.length} Pkt.`;
+  renderHint(); if(withProps) renderProps();
 }
 function renderScale(){
   const targets=[0.5,1,2,5,10,20,50,100]; let m=targets.find(t=>t*cam.s>=70)||100;
   $('#scaleBar').innerHTML=`<div style="width:${m*cam.s}px;height:6px;border:2px solid #1f2a1f;border-top:0"></div><div style="text-align:center">${fmt(m,m<1?1:0)} m</div>`;
 }
 function renderHint(){
-  const H={ select:'Element anklicken zum Bearbeiten · ziehen zum Verschieben · Leertaste/Rechtsklick + Ziehen = Ansicht verschieben',
+  const coarse = touchMode || matchMedia('(pointer:coarse)').matches;
+  const H = coarse ? { select:'Antippen = auswählen · ausgewähltes Element ziehen = verschieben · 1 Finger: Ansicht schieben · 2 Finger: zoomen',
+    path:'Tippe die Punkte des Weges', area:'Tippe die Eckpunkte der Fläche', line:'Tippe Punkte entlang der Hecke / des Zauns',
+    plant:'Pflanze unten wählen, dann in den Plan tippen', object:'Objekt unten wählen, dann in den Plan tippen', measure:'Tippe Start- und Endpunkt' }
+  : { select:'Element anklicken zum Bearbeiten · ziehen zum Verschieben · Leertaste/Rechtsklick + Ziehen = Ansicht verschieben',
     path:'Klicke Punkte für den Wegverlauf · Doppelklick oder Enter beendet · Shift = 15°-Winkel · Esc bricht ab',
     area:'Klicke die Eckpunkte der Fläche · auf den ersten Punkt klicken oder Enter schließt · Shift = 15°-Winkel',
     line:'Klicke Punkte entlang der Hecke/des Zauns · Doppelklick oder Enter beendet',
     plant:'Wähle rechts eine Pflanze und klicke in den Plan, um sie zu setzen',
     object:'Wähle rechts ein Objekt und klicke in den Plan, um es zu setzen',
     measure:'Klicke zwei Punkte, um eine Strecke zu messen' };
-  $('#hintBox').textContent = H[tool]||'';
+  $('#hintBox').textContent = (drawing && isMobile()) ? '' : (H[tool]||'');
 }
 
 /* ---------- Overlay: Auswahl, Griffe, Zeichnen ---------- */
 let measure=null; // {a,b}
-function handle(x,y,cls,data, r=5){ return `<circle cx="${x}" cy="${y}" r="${px(r)}" fill="#fff" stroke="var(--sel)" stroke-width="${px(2)}" class="${cls}" ${data} style="cursor:${cls==='h-rot'?'grab':'move'}"/>`; }
+function handle(x,y,cls,data, r=5){ return `<circle cx="${x}" cy="${y}" r="${px(r*HR())}" fill="#fff" stroke="var(--sel)" stroke-width="${px(2)}" class="${cls}" ${data} style="cursor:${cls==='h-rot'?'grab':'move'}"/>`; }
 function overlayMarkup(){
   let h='<g id="overlay">';
   const it=state.items.find(i=>i.id===sel.id);
@@ -862,8 +990,8 @@ function overlayMarkup(){
       h+=`<polyline points="${ptsAttr(closed?[...it.pts,it.pts[0]]:it.pts)}" fill="none" stroke="var(--sel)" stroke-width="${px(2)}" stroke-dasharray="${px(6)} ${px(4)}" pointer-events="none"/>`;
       // Mittelpunkt-Griffe (neuer Punkt)
       const n=it.pts.length; const segs=closed?n:n-1;
-      for(let i=0;i<segs;i++){ const a=it.pts[i], b=it.pts[(i+1)%n]; h+=`<circle cx="${(a[0]+b[0])/2}" cy="${(a[1]+b[1])/2}" r="${px(3.5)}" fill="var(--sel)" fill-opacity=".55" class="h-mid" data-i="${i}" style="cursor:copy"/>`; }
-      it.pts.forEach((p,i)=> h+=handle(p[0],p[1],'h-vtx',`data-i="${i}"`));
+      for(let i=0;i<segs;i++){ const a=it.pts[i], b=it.pts[(i+1)%n]; h+=`<circle cx="${(a[0]+b[0])/2}" cy="${(a[1]+b[1])/2}" r="${px(3.5*HR())}" fill="var(--sel)" fill-opacity=".55" class="h-mid" data-i="${i}" style="cursor:copy"/>`; }
+      it.pts.forEach((p,i)=> h+=handle(p[0],p[1],'h-vtx'+(sel.vtx===i?' active':''),`data-i="${i}"`));
     } else if(it.type==='plant'){
       h+=`<circle cx="${it.x}" cy="${it.y}" r="${it.d/2+px(4)}" fill="none" stroke="var(--sel)" stroke-width="${px(2)}" stroke-dasharray="${px(6)} ${px(4)}" pointer-events="none"/>`;
       h+=handle(it.x+it.d/2,it.y,'h-size','');
@@ -904,6 +1032,8 @@ function overlayMarkup(){
       h+=`<path d="M${a[0]} ${a[1]}L${b[0]} ${b[1]}" stroke="#1565c0" stroke-width="${px(2.5)}"/><circle cx="${a[0]}" cy="${a[1]}" r="${px(4)}" fill="#1565c0"/><circle cx="${b[0]}" cy="${b[1]}" r="${px(4)}" fill="#1565c0"/>`;
       h+=`<text x="${(a[0]+b[0])/2}" y="${(a[1]+b[1])/2-px(10)}" font-size="${px(14)}" text-anchor="middle" class="lbl" style="fill:#0d47a1">${fmt(L,2)} m</text>`; }
   }
+  // GPS-Standort
+  if(gps){ h+=`<circle cx="${gps.xy[0]}" cy="${gps.xy[1]}" r="${gps.acc}" fill="#1a73e8" fill-opacity=".12" stroke="#1a73e8" stroke-opacity=".4" stroke-width="${px(1)}" pointer-events="none"/><circle cx="${gps.xy[0]}" cy="${gps.xy[1]}" r="${px(7)}" fill="#1a73e8" stroke="#fff" stroke-width="${px(2.5)}" pointer-events="none"/>`; }
   // Fangpunkt-Anzeige
   if(snapHit && tool!=='select') h+=`<circle cx="${snapHit[0]}" cy="${snapHit[1]}" r="${px(7)}" fill="none" stroke="#1565c0" stroke-width="${px(2)}" pointer-events="none"/>`;
   return h+'</g>';
@@ -915,7 +1045,7 @@ function snapPoint(p, angle){
   snapHit=null;
   if(!$('#lySnap').checked) return p;
   // 1) Fang an vorhandenen Punkten (Grundstück, Gebäude, Elemente)
-  const tol=px(10); let best=null, bd=tol;
+  const tol=px(10*HR()); let best=null, bd=tol;
   const test=q=>{ const d=Math.hypot(q[0]-p[0],q[1]-p[1]); if(d<bd){ bd=d; best=q; } };
   for(const pa of state.parcels) for(const rings of pa.polys) for(const r of rings) r.forEach(test);
   for(const b of state.buildings) for(const rings of b.polys) for(const r of rings) r.forEach(test);
@@ -932,64 +1062,98 @@ function snapPoint(p, angle){
   return [ Math.round(p[0]*10)/10, Math.round(p[1]*10)/10 ];
 }
 
-/* ---------- Interaktion ---------- */
+/* ---------- Interaktion (Maus + Touch) ---------- */
 const keys={ shift:false, space:false };
-let drag=null; // {mode, ...}
+let drag=null;          // {mode, ...}
+let touchMode=false;    // letzte Eingabe per Finger → größere Griffe, Tippen statt Klicken
 const pointers=new Map();
-function evWorld(e){ const r=svg.getBoundingClientRect(); return toWorld(e.clientX-r.left, e.clientY-r.top); }
+const isMobile=()=>matchMedia('(max-width:820px)').matches;
+const HR=()=> touchMode?2:1;
+const clampS=s=>Math.max(1,Math.min(400,s));
+function localXY(e){ const r=svg.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; }
+function evWorld(e){ const [x,y]=localXY(e); return toWorld(x,y); }
 function hitItem(target){ const g=target.closest?.('[data-id]'); return g? state.items.find(i=>i.id===g.dataset.id):null; }
+
+// Klick bzw. Tippen an einer Stelle
+function pointAction(target, w){
+  if(tool==='select'){
+    const hit=hitItem(target);
+    sel.id=hit?hit.id:null; sel.vtx=null;
+    if(hit) openSheet(); else if(isMobile()) closeSheet();
+    renderAll(); return;
+  }
+  if(tool==='path'||tool==='area'||tool==='line'){ addDrawPoint(w); return; }
+  if(tool==='plant'||tool==='object'){ placeAt(snapPoint(w,false)); return; }
+  if(tool==='measure'){ const p=snapPoint(w,true); if(!measure||measure.b) measure={ a:p, b:null }; else measure.b=p; renderAll(false); }
+}
+function addDrawPoint(w){
+  const p=snapPoint(w,true);
+  if(!drawing){ drawing={ type:tool, pts:[] }; if(isMobile()) closeSheet(); }
+  if(drawing.type==='area' && drawing.pts.length>=3 && Math.hypot(p[0]-drawing.pts[0][0],p[1]-drawing.pts[0][1])<px(10*HR())){ finishDrawing(true); return; }
+  const last=drawing.pts.at(-1);
+  if(!last || Math.hypot(p[0]-last[0],p[1]-last[1])>0.02) drawing.pts.push(p);
+  renderAll(false);
+}
+function placeAt(p){
+  const before=snapshot(); let it;
+  if(tool==='plant'){ const c=PLANTS[prefs.plant]; it={ id:uid(), type:'plant', kind:prefs.plant, x:p[0], y:p[1], d:c.d, h:c.h }; }
+  else { const c=OBJECTS[prefs.object]; it={ id:uid(), type:'object', kind:prefs.object, x:p[0], y:p[1], w:c.w, d:c.d, h:c.h, rot:0, color:c.color }; }
+  state.items.push(it); commit(before); renderAll(false);
+  if(touchMode) toast((it.type==='plant'?PLANTS[it.kind]:OBJECTS[it.kind]).name+' gesetzt');
+}
+function startPinch(){
+  if(drag && drag.before && drag.mode!=='pan' && (drag.mode!=='move'||drag.moved)) commit(drag.before);
+  const [a,b]=[...pointers.values()]; const r=svg.getBoundingClientRect();
+  drag={ mode:'pinch', d0:Math.hypot(a.x-b.x,a.y-b.y)||1, s0:cam.s, wm:toWorld((a.x+b.x)/2-r.left,(a.y+b.y)/2-r.top) };
+}
 
 svg.addEventListener('contextmenu', e=>e.preventDefault());
 svg.addEventListener('pointerdown', e=>{
-  svg.setPointerCapture(e.pointerId);
+  touchMode = e.pointerType==='touch';
+  try{ svg.setPointerCapture(e.pointerId); }catch(_){}
   pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(pointers.size===2){ // Pinch-Zoom
-    const [a,b]=[...pointers.values()];
-    drag={ mode:'pinch', d0:Math.hypot(a.x-b.x,a.y-b.y), s0:cam.s, cx:cam.cx, cy:cam.cy }; return;
+  if(pointers.size===2){ startPinch(); return; }
+  if(pointers.size>2) return;
+  const w=evWorld(e); if(!touchMode) cursor=w;
+  if(e.button===1 || e.button===2 || keys.space){ drag={ mode:'pan', sx:e.clientX, sy:e.clientY, cx:cam.cx, cy:cam.cy, tap:false }; svg.classList.add('c-pan'); return; }
+  const t=e.target; const it=state.items.find(i=>i.id===sel.id);
+  if(tool==='select' && it){
+    if(t.classList.contains('h-vtx')){ sel.vtx=+t.dataset.i; drag={ mode:'vtx', i:+t.dataset.i, before:snapshot() }; renderAll(); return; }
+    if(t.classList.contains('h-mid')){ const i=+t.dataset.i; const before=snapshot(); it.pts.splice(i+1,0,snapPoint(w,false)); sel.vtx=i+1; drag={ mode:'vtx', i:i+1, before }; renderAll(); return; }
+    if(t.classList.contains('h-rot')){ drag={ mode:'rot', before:snapshot() }; return; }
+    if(t.classList.contains('h-size')){ drag={ mode:'size', before:snapshot() }; return; }
   }
-  const w=evWorld(e);
-  if(e.button===1 || e.button===2 || keys.space){ drag={ mode:'pan', sx:e.clientX, sy:e.clientY, cx:cam.cx, cy:cam.cy }; svg.classList.add('c-pan'); return; }
   if(tool==='select'){
-    const t=e.target;
-    const it=state.items.find(i=>i.id===sel.id);
-    if(it && t.classList.contains('h-vtx')){ drag={ mode:'vtx', i:+t.dataset.i, before:snapshot() }; return; }
-    if(it && t.classList.contains('h-mid')){ const i=+t.dataset.i; const before=snapshot(); it.pts.splice(i+1,0,snapPoint(w,false)); drag={ mode:'vtx', i:i+1, before }; renderAll(); return; }
-    if(it && t.classList.contains('h-rot')){ drag={ mode:'rot', before:snapshot() }; return; }
-    if(it && t.classList.contains('h-size')){ drag={ mode:'size', before:snapshot() }; return; }
     const hit=hitItem(t);
-    if(hit){ sel.id=hit.id; drag={ mode:'move', start:w, orig:JSON.parse(JSON.stringify(hit)), before:snapshot(), moved:false }; renderAll(); return; }
-    sel.id=null; drag={ mode:'pan', sx:e.clientX, sy:e.clientY, cx:cam.cx, cy:cam.cy, click:true }; renderAll(); return;
+    // Maus: sofort auswählen und ziehen. Finger: nur ein schon ausgewähltes Element wird gezogen,
+    // sonst verschiebt der Finger die Ansicht (Tippen wählt aus).
+    if(hit && (!touchMode || hit.id===sel.id)){
+      if(sel.id!==hit.id){ sel.id=hit.id; sel.vtx=null; openSheet(); }
+      drag={ mode:'move', start:w, orig:JSON.parse(JSON.stringify(hit)), before:snapshot(), moved:false }; renderAll(); return;
+    }
   }
-  if(tool==='path'||tool==='area'||tool==='line'){
-    const p=snapPoint(w,true);
-    if(!drawing) drawing={ type:tool, pts:[] };
-    if(drawing.type==='area' && drawing.pts.length>=3 && Math.hypot(p[0]-drawing.pts[0][0],p[1]-drawing.pts[0][1])<px(10)){ finishDrawing(true); return; }
-    const last=drawing.pts.at(-1);
-    if(!last || Math.hypot(p[0]-last[0],p[1]-last[1])>0.02) drawing.pts.push(p);
-    renderAll(); return;
-  }
-  if(tool==='plant'||tool==='object'){
-    const p=snapPoint(w,false); const before=snapshot();
-    let it;
-    if(tool==='plant'){ const c=PLANTS[prefs.plant]; it={ id:uid(), type:'plant', kind:prefs.plant, x:p[0], y:p[1], d:c.d, h:c.h }; }
-    else { const c=OBJECTS[prefs.object]; it={ id:uid(), type:'object', kind:prefs.object, x:p[0], y:p[1], w:c.w, d:c.d, h:c.h, rot:0, color:c.color }; }
-    state.items.push(it); commit(before); renderAll(); return;
-  }
-  if(tool==='measure'){
-    const p=snapPoint(w,true);
-    if(!measure || measure.b) measure={ a:p, b:null }; else measure.b=p;
-    renderAll(); return;
-  }
+  if(!touchMode && tool!=='select'){ pointAction(t,w); return; }
+  drag={ mode:'pan', sx:e.clientX, sy:e.clientY, cx:cam.cx, cy:cam.cy, tap:true, target:t, w };
 });
 svg.addEventListener('pointermove', e=>{
   if(pointers.has(e.pointerId)) pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  const w=evWorld(e); cursor=w;
-  if(!drag){ if(tool!=='select'){ renderAll(); } return; }
-  if(drag.mode==='pinch' && pointers.size===2){
-    const [a,b]=[...pointers.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y);
-    cam.s=Math.max(1,Math.min(400,drag.s0*d/drag.d0)); renderAll(); return;
+  const w=evWorld(e);
+  if(e.pointerType!=='touch') cursor=w;
+  if(!drag){ if(tool!=='select' && e.pointerType!=='touch') renderAll(false); return; }
+  if(drag.mode==='dead') return;
+  if(drag.mode==='pinch'){
+    if(pointers.size<2) return;
+    const [a,b]=[...pointers.values()]; const r=svg.getBoundingClientRect();
+    cam.s=clampS(drag.s0*Math.hypot(a.x-b.x,a.y-b.y)/drag.d0);
+    const mx=(a.x+b.x)/2-r.left, my=(a.y+b.y)/2-r.top;
+    cam.cx=drag.wm[0]-(mx-planW/2)/cam.s; cam.cy=drag.wm[1]-(my-planH/2)/cam.s;
+    renderView(); return;   // Inhalt wird am Ende der Geste neu gezeichnet
   }
-  if(drag.mode==='pan'){ cam.cx=drag.cx-(e.clientX-drag.sx)/cam.s; cam.cy=drag.cy-(e.clientY-drag.sy)/cam.s; if(Math.abs(e.clientX-drag.sx)+Math.abs(e.clientY-drag.sy)>3) drag.click=false; renderAll(); return; }
+  if(drag.mode==='pan'){
+    if(drag.tap && Math.abs(e.clientX-drag.sx)+Math.abs(e.clientY-drag.sy)>(touchMode?10:4)) drag.tap=false;
+    if(!drag.tap){ cam.cx=drag.cx-(e.clientX-drag.sx)/cam.s; cam.cy=drag.cy-(e.clientY-drag.sy)/cam.s; renderView(); }
+    return;
+  }
   const it=state.items.find(i=>i.id===sel.id); if(!it) return;
   if(drag.mode==='move'){
     let dx=w[0]-drag.start[0], dy=w[1]-drag.start[1];
@@ -1003,40 +1167,79 @@ svg.addEventListener('pointermove', e=>{
     else { const r=-(it.rot||0)*Math.PI/180; const dx=w[0]-it.x, dy=w[1]-it.y; const u=dx*Math.cos(r)-dy*Math.sin(r), v=dx*Math.sin(r)+dy*Math.cos(r);
       it.w=Math.max(0.2,Math.round(Math.abs(u)*2*10)/10); it.d=Math.max(0.2,Math.round(Math.abs(v)*2*10)/10); if(OBJECTS[it.kind]?.round) it.d=it.w; }
   }
-  renderAll();
+  renderAll(false);
 });
 function endPointer(e){
   pointers.delete(e.pointerId);
   if(!drag) return;
-  if(drag.mode==='pinch'){ if(pointers.size<2) drag=null; return; }
+  if(drag.mode==='pinch' || drag.mode==='dead'){
+    if(drag.mode==='pinch') renderAll(false);
+    drag = pointers.size ? { mode:'dead' } : null; return;
+  }
   svg.classList.remove('c-pan');
-  if(['vtx','rot','size'].includes(drag.mode) || (drag.mode==='move'&&drag.moved)) commit(drag.before);
-  drag=null; renderAll();
+  const d=drag; drag=null;
+  if(d.mode==='pan'){ if(d.tap && e.type==='pointerup') pointAction(d.target, d.w); else renderAll(false); return; }
+  if(['vtx','rot','size'].includes(d.mode) || (d.mode==='move'&&d.moved)) commit(d.before);
+  renderAll();
 }
 svg.addEventListener('pointerup', endPointer);
 svg.addEventListener('pointercancel', endPointer);
-svg.addEventListener('pointerleave', ()=>{ cursor=null; if(!drag && tool!=='select') renderAll(); });
+svg.addEventListener('pointerleave', e=>{ if(e.pointerType==='touch') return; cursor=null; if(!drag && tool!=='select') renderAll(false); });
 svg.addEventListener('dblclick', e=>{
   if(drawing){ // doppelt gesetzten letzten Punkt entfernen
-    if(drawing.pts.length>=2){ const a=drawing.pts.at(-1), b=drawing.pts.at(-2); if(Math.hypot(a[0]-b[0],a[1]-b[1])<px(6)) drawing.pts.pop(); }
+    if(drawing.pts.length>=2){ const a=drawing.pts.at(-1), b=drawing.pts.at(-2); if(Math.hypot(a[0]-b[0],a[1]-b[1])<px(6*HR())) drawing.pts.pop(); }
     finishDrawing(true); return;
   }
-  if(tool==='select' && e.target.classList.contains('h-vtx')){
-    const it=state.items.find(i=>i.id===sel.id); const min=it.type==='area'?3:2;
-    if(it.pts.length>min){ const before=snapshot(); it.pts.splice(+e.target.dataset.i,1); commit(before); renderAll(); }
-  }
+  if(tool==='select' && e.target.classList.contains('h-vtx')){ sel.vtx=+e.target.dataset.i; deleteVertex(); }
 });
+function deleteVertex(){
+  const it=state.items.find(i=>i.id===sel.id); if(!it?.pts || sel.vtx==null) return;
+  const min=it.type==='area'?3:2;
+  if(it.pts.length<=min){ toast('Weniger Punkte geht nicht – lösche stattdessen das ganze Element.'); return; }
+  const before=snapshot(); it.pts.splice(sel.vtx,1); sel.vtx=null; commit(before); renderAll();
+}
 svg.addEventListener('wheel', e=>{
   e.preventDefault();
-  const r=svg.getBoundingClientRect(); const mx=e.clientX-r.left, my=e.clientY-r.top;
+  const [mx,my]=localXY(e);
   const before=toWorld(mx,my);
-  cam.s=Math.max(1,Math.min(400, cam.s*Math.pow(1.0015,-e.deltaY)));
+  cam.s=clampS(cam.s*Math.pow(1.0015,-e.deltaY));
   const after=toWorld(mx,my); cam.cx+=before[0]-after[0]; cam.cy+=before[1]-after[1];
-  renderAll();
+  renderAll(false);
 },{ passive:false });
-function zoomBy(f){ cam.s=Math.max(1,Math.min(400,cam.s*f)); renderAll(); }
-$('#zIn').onclick=()=>zoomBy(1.4); $('#zOut').onclick=()=>zoomBy(1/1.4); $('#zFit').onclick=()=>{ fitPlan(); renderAll(); };
-['lyAerial','lyAerialOp','lyParcel','lyBuild','lyGrid','lyLabels','lySnap'].forEach(id=>$('#'+id).addEventListener('input',renderAll));
+function zoomBy(f){ cam.s=clampS(cam.s*f); renderAll(false); }
+$('#zIn').onclick=()=>zoomBy(1.4); $('#zOut').onclick=()=>zoomBy(1/1.4); $('#zFit').onclick=()=>{ fitPlan(); renderAll(false); };
+['lyAerial','lyAerialOp','lyParcel','lyBuild','lyGrid','lyLabels','lySnap'].forEach(id=>$('#'+id).addEventListener('input',()=>renderAll(false)));
+$('#layerToggle').onclick=()=>$('#layerBox').classList.toggle('collapsed');
+
+// Zeichenleiste (wichtig für Touch: kein Doppelklick nötig)
+$('#dbUndo').onclick=()=>{ if(!drawing) return; drawing.pts.pop(); if(!drawing.pts.length) drawing=null; renderAll(false); };
+$('#dbCancel').onclick=()=>{ drawing=null; renderAll(false); };
+$('#dbOk').onclick=()=>finishDrawing(true);
+
+// Unteres Blatt (Handy): Eigenschaften / Katalog ein- und ausklappen
+let sheetOpen=!isMobile();
+function applySheet(){ $('#props').classList.toggle('collapsed',!sheetOpen); $('#sheetChev').textContent=sheetOpen?'▾':'▴'; }
+function openSheet(){ sheetOpen=true; applySheet(); }
+function closeSheet(){ sheetOpen=false; applySheet(); }
+$('#sheetHandle').onclick=()=>{ sheetOpen=!sheetOpen; applySheet(); };
+new ResizeObserver(()=>{ if(currentView!=='plan') return; const w=planW,h=planH; resizePlan(); if(w!==planW||h!==planH) renderAll(false); }).observe($('#planWrap'));
+
+// GPS-Standort im Plan
+let gps=null, gpsWatch=null;
+function toggleGPS(){
+  if(gpsWatch!=null){ navigator.geolocation.clearWatch(gpsWatch); gpsWatch=null; gps=null; $('#zGps').classList.remove('on'); renderAll(); return; }
+  if(!navigator.geolocation){ toast('Dein Gerät stellt keinen Standort bereit.'); return; }
+  let first=true; $('#zGps').classList.add('on'); toast('Suche Standort …');
+  gpsWatch=navigator.geolocation.watchPosition(p=>{
+    if(!state.origin) return;
+    const xy=makeProj(state.origin).toLocal(p.coords.latitude,p.coords.longitude);
+    gps={ xy, acc:p.coords.accuracy };
+    if(first){ first=false; cam.cx=xy[0]; cam.cy=xy[1]; cam.s=Math.max(cam.s,15); toast(`Standort gefunden (± ${Math.round(p.coords.accuracy)} m)`); renderAll(); }
+    else renderAll(false);
+  }, err=>{ toast('Standort nicht verfügbar: '+(err.code===1?'Zugriff wurde nicht erlaubt':err.message)); if(gpsWatch!=null) navigator.geolocation.clearWatch(gpsWatch); gpsWatch=null; gps=null; $('#zGps').classList.remove('on'); renderAll(false); },
+  { enableHighAccuracy:true, maximumAge:2000, timeout:20000 });
+}
+$('#zGps').onclick=toggleGPS;
 
 function finishDrawing(save){
   const d=drawing; drawing=null;
@@ -1089,8 +1292,12 @@ function matOptions(cur, kind){ return Object.entries(MATERIALS).filter(([k,m])=
 function optList(obj,cur){ return Object.entries(obj).map(([k,m])=>`<option value="${k}" ${k===cur?'selected':''}>${m.name}</option>`).join(''); }
 function num(label,key,val,step=0.1,min=0){ return `<label class="field">${label}<input type="number" data-k="${key}" value="${+(+val).toFixed(2)}" step="${step}" min="${min}"></label>`; }
 
+function setPropsBody(P,h){
+  P.innerHTML=h;
+  const m=h.match(/<h3>(.*?)<\/h3>/); $('#sheetTitle').innerHTML = m? m[1] : '';
+}
 function renderProps(){
-  const P=$('#props');
+  const P=$('#propsBody');
   if(!state.origin){ P.innerHTML=''; return; }
   const it=state.items.find(i=>i.id===sel.id);
   let h='';
@@ -1120,8 +1327,10 @@ function renderProps(){
       h+=`<label class="field">Farbe<input type="color" data-k="color" value="${it.color||c.color}"></label>`;
     }
     h+=`<div class="btnrow"><button class="btn secondary" id="pDup">Duplizieren</button><button class="btn danger" id="pDel">Löschen</button></div>`;
-    if(it.pts) h+=`<p class="hint" style="font-size:12px;color:var(--muted);margin:0">Punkte ziehen zum Ändern · kleine Punkte auf den Kanten ziehen fügt Punkte hinzu · Doppelklick auf einen Punkt entfernt ihn.</p>`;
-    P.innerHTML=h;
+    if(it.pts && sel.vtx!=null && it.pts[sel.vtx]) h+=`<button class="btn secondary" id="pVtxDel">Markierten Punkt ${sel.vtx+1} löschen</button>`;
+    if(it.pts) h+=`<p class="hint" style="font-size:12px;color:var(--muted);margin:0">Punkte ziehen zum Ändern · kleine Punkte auf den Kanten ziehen fügt Punkte hinzu · Punkt antippen und „Punkt löschen“ entfernt ihn.</p>`;
+    setPropsBody(P,h);
+    $('#pVtxDel')?.addEventListener('click',deleteVertex);
     P.querySelectorAll('[data-k]').forEach(inp=>{
       inp.addEventListener('change',()=>{
         const k=inp.dataset.k; const b=snapshot(); let v=inp.type==='number'?parseFloat(inp.value):inp.value;
@@ -1151,7 +1360,8 @@ function renderProps(){
   } else if(tool==='measure'){
     h+=`<h3>Messen</h3><p class="hint" style="font-size:13px;color:var(--muted);margin:0">Klicke Start- und Endpunkt. Punkte rasten an Ecken von Grundstück, Gebäuden und Elementen ein.</p>`;
   }
-  if(h){ P.innerHTML=h; wireToolOpts(); return; }
+  if((tool==='plant'||tool==='object') && gps) h+=`<button class="btn secondary" id="tGpsPlace">📍 An meinem Standort setzen</button>`;
+  if(h){ setPropsBody(P,h); wireToolOpts(); return; }
   // Übersicht
   h+=`<h3>Übersicht</h3>`;
   for(const p of state.parcels) h+=`<div class="stat"><span>${esc(p.label)}</span><span>${Number(p.props.flaeche||0).toLocaleString('de-DE')} m²</span></div>`;
@@ -1166,16 +1376,18 @@ function renderProps(){
   if(Object.keys(plants).length){ h+=`<h4>Pflanzenliste</h4>`; for(const [k,v] of Object.entries(plants).sort()) h+=`<div class="stat"><span>${esc(k)}</span><span>${v}×</span></div>`; }
   const objs={}; for(const it of state.items) if(it.type==='object'){ const n=it.name||OBJECTS[it.kind].name; objs[n]=(objs[n]||0)+1; }
   if(Object.keys(objs).length){ h+=`<h4>Objekte</h4>`; for(const [k,v] of Object.entries(objs).sort()) h+=`<div class="stat"><span>${esc(k)}</span><span>${v}×</span></div>`; }
-  if(!state.items.length) h+=`<p class="hint" style="font-size:13px;color:var(--muted);margin:0;line-height:1.5">Wähle links ein Werkzeug:<br><b>Weg</b> – Wege mit Breite und Belag<br><b>Fläche</b> – Rasen, Beete, Terrasse, Teich …<br><b>Hecke/Zaun</b> – Hecken, Zäune, Mauern<br><b>Pflanze</b> / <b>Objekt</b> – aus dem Katalog setzen<br><br>Mausrad zoomt, Rechtsklick + Ziehen verschiebt die Ansicht.</p>`;
-  P.innerHTML=h;
+  if(!state.items.length) h+=`<p class="hint" style="font-size:13px;color:var(--muted);margin:0;line-height:1.5">Wähle ein Werkzeug:<br><b>Weg</b> – Wege mit Breite und Belag<br><b>Fläche</b> – Rasen, Beete, Terrasse, Teich …<br><b>Hecke/Zaun</b> – Hecken, Zäune, Mauern<br><b>Pflanze</b> / <b>Objekt</b> – aus dem Katalog setzen<br><br>Zoomen: Mausrad oder zwei Finger. Verschieben: Rechtsklick + Ziehen oder mit einem Finger wischen.</p>`;
+  setPropsBody(P,h);
 }
 function wireToolOpts(){
-  const P=$('#props');
+  const P=$('#propsBody');
+  $('#tGpsPlace')?.addEventListener('click',()=>{ if(gps) placeAt([...gps.xy]); });
   $('#tPathMat')?.addEventListener('change',e=>prefs.pathMat=e.target.value);
   $('#tPathW')?.addEventListener('change',e=>{ const v=parseFloat(e.target.value); if(v>0) prefs.pathW=v; });
   $('#tAreaMat')?.addEventListener('change',e=>prefs.areaMat=e.target.value);
   $('#tLine')?.addEventListener('change',e=>prefs.lineKind=e.target.value);
-  P.querySelectorAll('.catalog button').forEach(b=>b.onclick=()=>{ if(tool==='plant') prefs.plant=b.dataset.c; else prefs.object=b.dataset.c; renderProps(); });
+  P.querySelectorAll('.catalog button').forEach(b=>b.onclick=()=>{ if(tool==='plant') prefs.plant=b.dataset.c; else prefs.object=b.dataset.c;
+    P.querySelectorAll('.catalog button').forEach(x=>x.classList.toggle('active',x===b)); });
 }
 
 /* ---------- Export PNG ---------- */
@@ -1214,7 +1426,7 @@ let R=null; // {renderer, scene, camera, controls, root, sun, ...}
 function init3D(){
   const wrap=$('#v3wrap');
   const renderer=new THREE.WebGLRenderer({ antialias:true, preserveDrawingBuffer:true });
-  renderer.setPixelRatio(Math.min(2,devicePixelRatio));
+  renderer.setPixelRatio(Math.min(isMobile()?1.5:2,devicePixelRatio));
   renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;
@@ -1226,7 +1438,7 @@ function init3D(){
   controls.enableDamping=true; controls.maxPolarAngle=Math.PI/2-0.03; controls.screenSpacePanning=false;
   scene.add(new THREE.HemisphereLight('#e8f2ff','#5d6b4a',0.9));
   const sun=new THREE.DirectionalLight('#fff6e5',2.4); sun.castShadow=true;
-  sun.shadow.mapSize.set(4096,4096); sun.shadow.bias=-0.0004; sun.shadow.normalBias=0.03;
+  const sm=isMobile()?2048:4096; sun.shadow.mapSize.set(sm,sm); sun.shadow.bias=-0.0004; sun.shadow.normalBias=0.03;
   scene.add(sun); scene.add(sun.target);
   const root=new THREE.Group(); scene.add(root);
   R={ renderer, scene, camera, controls, sun, root, dirty:true, texCache:{} };
@@ -1254,6 +1466,7 @@ function sceneExtent(){
 function setCam(mode){
   const e=sceneExtent();
   R.controls.target.set(e.cx,0,e.cz);
+  const k=R.camera.aspect<1 ? Math.pow(1/R.camera.aspect,0.75) : 1; e.size*=k;   // Hochformat: weiter weg
   if(mode==='top') R.camera.position.set(e.cx, e.size*1.35, e.cz+0.01);
   else R.camera.position.set(e.cx-e.size*0.35, e.size*0.6, e.cz+e.size*0.95);
   R.controls.update();
@@ -1582,7 +1795,17 @@ $('#setReset').onclick=()=>{ if(!confirm('Wirklich alles löschen? Grundstück u
 /* =====================================================================
    Start
    ===================================================================== */
-buildToolbar(); updateUndoButtons(); setupGoogle();
+buildToolbar(); updateUndoButtons(); setupGoogle(); applySheet();
+if(isMobile()){ $('#layerBox').classList.add('collapsed'); $('#v3ctrl').classList.add('collapsed'); }
+$('#v3toggle').onclick=()=>$('#v3ctrl').classList.toggle('collapsed');
+// Menü (Handy)
+$('#btnMore').onclick=e=>{ e.stopPropagation(); $('#moreMenu').classList.toggle('open'); };
+document.addEventListener('click',e=>{ if(!e.target.closest('#moreMenu')) $('#moreMenu').classList.remove('open'); });
+$('#moreMenu').addEventListener('click',e=>{ const a=e.target.closest('button')?.dataset.act; if(!a) return; $('#moreMenu').classList.remove('open');
+  if(a==='open') $('#btnOpen').click(); if(a==='save') $('#btnSave').click(); if(a==='settings') $('#btnSettings').click();
+  if(a==='png'){ if(currentView==='3d') $('#v3png').click(); else if(state.origin) exportPlanPNG(); } });
+// Offline-Fähigkeit + „Zum Startbildschirm“ (nur wenn über https ausgeliefert)
+if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 const stored=loadStored();
 if(stored && stored.origin){ state=stored; enableTabs(); pendingFit=true; showView('plan'); }
 window.__garten={ get state(){return state;}, set state(v){state=v;}, renderAll, showView, fitPlan, build3D };
