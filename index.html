@@ -1533,16 +1533,21 @@ async function detectBestand(onStep=()=>{}){
   const f=Math.min(1, 2000/Math.max(W,H)); W=Math.round(W*f); H=Math.round(H*f);
   const grid={ x0:A.x0, y0:A.y0, W, H, res:(A.x1-A.x0)/W };
   onStep('Lade Höhenmodell …');
-  const [hp, cp] = await Promise.all([
+  const [hp, cp, rp] = await Promise.all([
     loadPixels(wmsUrl(HOEHE_WMS,'hoehendifferenz',A.s,A.w,A.n,A.e,W,H),W,H),
-    loadPixels(wmsUrl(CIR_WMS,'sn_dop_020_cir',A.s,A.w,A.n,A.e,W,H,'image/jpeg'),W,H) ]);
+    loadPixels(wmsUrl(CIR_WMS,'sn_dop_020_cir',A.s,A.w,A.n,A.e,W,H,'image/jpeg'),W,H),
+    loadPixels(wmsUrl(DOP_URL,'sn_dop_020',A.s,A.w,A.n,A.e,W,H,'image/jpeg'),W,H) ]);
   onStep('Werte aus …');
-  const N=W*H, Hm=new Float32Array(N), veg=new Uint8Array(N);
+  const N=W*H, Hm=new Float32Array(N), veg=new Uint8Array(N), grey=new Uint8Array(N);
   for(let i=0;i<N;i++){
     Hm[i]=ndomHeight(hp[i*4],hp[i*4+1],hp[i*4+2]);
     const nir=cp[i*4], red=cp[i*4+1], bright=cp[i*4]+cp[i*4+1]+cp[i*4+2];
     const ndvi=(nir-red)/(nir+red+1);
     veg[i]= ndvi>0.1 || (bright<170 && ndvi>-0.02) ? 1 : 0;   // im Schatten großzügiger
+    // „Grau“ = befestigt: kaum Vegetation im Infrarot UND im Farbbild grau/hell, nicht grünlich.
+    // Winterliches Gras oder Wiese unter kahlen Bäumen ist so nicht mehr „Pflaster“.
+    const r=rp[i*4], g=rp[i*4+1], b=rp[i*4+2], mx=Math.max(r,g,b), mn=Math.min(r,g,b), sat=(mx-mn)/(mx+1);
+    grey[i]= ndvi<0.08 && sat<0.16 && r+g+b>200 ? 1 : 0;
   }
   const parcelM=rasterMask(state.parcels.flatMap(p=>p.polys), grid, 0);
   const buildM=rasterMask(state.buildings.flatMap(b=>b.polys), grid, 0.8);
@@ -1553,12 +1558,16 @@ async function detectBestand(onStep=()=>{}){
   for(const b of state.buildings){
     const m=morph(rasterMask(b.polys,grid,0),W,H,2,false); const hs=[];   // 50 cm nach innen, damit Bäume am Rand nicht mitzählen
     for(let i=0;i<N;i++) if(m[i]&&Hm[i]>0.5) hs.push(Hm[i]);
-    if(hs.length>8){ b.hEave=Math.max(2,percentile(hs,0.2)); b.hRidge=Math.max(b.hEave,percentile(hs,0.9)); }
+    if(hs.length>8){ b.hEave=Math.max(2,percentile(hs,0.2)); b.hRidge=Math.max(b.hEave,percentile(hs,0.9));
+      if(/garage|schuppen|carport|neben/i.test(b.funktion)){ b.hEave=Math.min(b.hEave,3.2); b.hRidge=Math.min(b.hRidge,b.hEave+2); } }
   }
 
   // 1) Bäume: Höhe ≥ 3 m (keine flachen Dächer)
   onStep('Erkenne Bäume …');
-  const tall=new Uint8Array(N); for(let i=0;i<N;i++) tall[i]=valid[i]&&Hm[i]>=3?1:0;
+  let tall=new Uint8Array(N); for(let i=0;i<N;i++) tall[i]=valid[i]&&Hm[i]>=3?1:0;
+  tall=morph(morph(tall,W,H,2,true),W,H,2,false);   // lückige Kronen (kahle Bäume im Laserscan) schließen
+  for(let i=0;i<N;i++){ if(!valid[i]) tall[i]=0; else if(tall[i]&&Hm[i]<3){ // Lücke: Höhe aus Nachbarn
+    const x=i%W, y=(i/W)|0; let m=0; for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){ const nx=x+dx, ny=y+dy; if(nx>=0&&ny>=0&&nx<W&&ny<H) m=Math.max(m,Hm[ny*W+nx]); } Hm[i]=Math.max(Hm[i],m*0.9); } }
   const T=components(tall,W,H);
   const used=new Uint8Array(N);
   for(let ci=0;ci<T.comps.length;ci++){
@@ -1618,14 +1627,14 @@ async function detectBestand(onStep=()=>{}){
   // 3) Bodenflächen: Rasen und befestigte Flächen (Einfahrt, Wege, Terrasse)
   onStep('Erkenne Rasen und Pflaster …');
   let paved=new Uint8Array(N), lawn=new Uint8Array(N);
-  for(let i=0;i<N;i++){ if(!valid[i]) continue; if(Hm[i]<0.5 && !veg[i]) paved[i]=1; else if(!(Hm[i]>=0.5&&Hm[i]<3&&!veg[i])) lawn[i]=1; }
-  paved=morph(morph(paved,W,H,2,false),W,H,2,true);   // Öffnen: Rauschen weg
+  for(let i=0;i<N;i++){ if(!valid[i]) continue; if(Hm[i]<0.5 && grey[i]) paved[i]=1; else lawn[i]=1; }
+  paved=morph(morph(paved,W,H,3,false),W,H,3,true);   // Öffnen: Rauschen weg
   lawn=morph(morph(lawn,W,H,2,true),W,H,2,false);     // Schließen: Lücken zu
   for(let i=0;i<N;i++) if(paved[i]) lawn[i]=0;
   const addAreas=(mask,mat,minA)=>{ const C=components(mask,W,H); C.comps.forEach((px_,id)=>{ if(px_.length*pxA<minA) return;
     const poly=traceOutline(px_,C.lab,id,grid); if(poly && ringArea(poly)>=minA) items.push({ id:uid(), type:'area', mat, bestand:true, pts:poly.map(q=>q.map(v=>Math.round(v*100)/100)) }); }); };
   addAreas(lawn,'rasen',6);
-  addAreas(paved,'pflaster',3);
+  addAreas(paved,'pflaster',4);
   return items;
 }
 async function runDetection(ask=true){
