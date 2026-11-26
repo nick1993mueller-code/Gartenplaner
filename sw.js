@@ -1,5 +1,5 @@
 // Service Worker: App offline startbar machen und das Luftbild des Plans zwischenspeichern
-const CACHE = 'gartenplaner-v2';
+const CACHE = 'gartenplaner-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {

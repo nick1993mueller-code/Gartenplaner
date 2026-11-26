@@ -291,6 +291,7 @@ body{height:100dvh}
         <div class="v3body">
         <label>Boden
           <select id="v3ground" style="margin-left:auto">
+            <option value="design">Gestaltet</option>
             <option value="aerial">Luftbild</option>
             <option value="lawn">Rasen (neutral)</option>
           </select>
@@ -700,7 +701,7 @@ $('#btnTake').onclick = async ()=>{
     ns.aerial={ s:S,w:W,n:N,e:E, x0,y0,x1,y1, px:[Math.round(wm/res), Math.round(hm/res)] };
     state=ns; history.undo.length=0; history.redo.length=0; updateUndoButtons();
     persist(); enableTabs(); pendingFit=true; lastBuilt=null; showView('plan');
-    setStatus(''); toast('Grundstück übernommen – jetzt kannst du planen.');
+    setStatus(''); runDetection(false);
   }catch(err){ setStatus(err.message,true); }
   $('#btnTake').disabled=!selected.length;
 };
@@ -889,7 +890,7 @@ function itemMarkup(it){
   if(it.type==='plant'){
     const cat=PLANTS[it.kind]||PLANTS.strauch;
     let g=`<g data-id="${it.id}" transform="translate(${it.x.toFixed(3)} ${it.y.toFixed(3)})" filter="url(#shadow)">${plantSymbol(it,cat)}</g>`;
-    if(lbl && it.d*cam.s>34) g+=`<text x="${it.x}" y="${it.y+it.d/2+px(12)}" font-size="${px(11)}" text-anchor="middle" class="lbl">${esc(it.name||cat.name)}</text>`;
+    if(lbl && !it.bestand && it.d*cam.s>34) g+=`<text x="${it.x}" y="${it.y+it.d/2+px(12)}" font-size="${px(11)}" text-anchor="middle" class="lbl">${esc(it.name||cat.name)}</text>`;
     return g;
   }
   if(it.type==='object'){
@@ -937,13 +938,17 @@ function renderAll(withProps=true){
     for(let y=Math.ceil(a.y0);y<=a.y1;y++) d+=`M${a.x0} ${y}H${a.x1}`;
     h+=`<path d="${d}" stroke="#fff" stroke-opacity=".35" stroke-width="${px(1)}"/>`;
   }
-  // Gebäude
-  if($('#lyBuild').checked) for(const b of state.buildings){
-    for(const rings of b.polys) h+=`<path d="${rings.map(ringPath).join('')}" fill="#d9d3c7" fill-opacity=".72" fill-rule="evenodd" stroke="#6d665b" stroke-width="${px(1.5)}"/>`;
-  }
-  // Elemente
+  // Elemente: Flächen und Wege unten, darüber Gebäude, dann Hecken, Objekte, Pflanzen
   const items=[...state.items].sort((a,b)=>LAYER_ORDER[a.type]-LAYER_ORDER[b.type]);
-  h+='<g id="items">'; for(const it of items) h+=itemMarkup(it); h+='</g>';
+  h+='<g id="items">'; for(const it of items) if(it.type==='area'||it.type==='path') h+=itemMarkup(it); h+='</g>';
+  if($('#lyBuild').checked){
+    for(const b of state.buildings) for(const rings of b.polys) h+=`<path d="${rings.map(ringPath).join('')}" fill="#d9d3c7" fill-opacity=".9" fill-rule="evenodd" stroke="#6d665b" stroke-width="${px(1.5)}" pointer-events="none"/>`;
+    if($('#lyLabels').checked) for(const b of state.buildings){ const r=b.polys[0]?.[0]; if(!r) continue; const bb=bboxOf([r]); if(Math.min(bb.x1-bb.x0,bb.y1-bb.y0)*cam.s<45) continue;
+      let cx=0,cy=0; r.forEach(p=>{cx+=p[0];cy+=p[1];}); cx/=r.length; cy/=r.length;
+      if(!state.parcels.some(pa=>pa.polys.some(rings=>pipRings([cx,cy],rings)))) continue;
+      h+=`<text x="${cx.toFixed(2)}" y="${cy.toFixed(2)}" font-size="${px(10.5)}" text-anchor="middle" class="lbl" style="fill:#5a5348">${esc(b.funktion)}${b.hRidge?` · ${fmt(b.hRidge,1)} m`:''}</text>`; }
+  }
+  h+='<g id="items2">'; for(const it of items) if(!(it.type==='area'||it.type==='path')) h+=itemMarkup(it); h+='</g>';
   // Grundstücksgrenze
   if($('#lyParcel').checked) for(const p of state.parcels) for(const rings of p.polys){
     h+=`<path d="${rings.map(ringPath).join('')}" fill="none" stroke="#fff" stroke-width="${px(4)}" stroke-linejoin="round" pointer-events="none"/>`;
@@ -1326,6 +1331,7 @@ function renderProps(){
                  : `<div class="row">${num('Breite (m)','w',it.w,0.1,0.2)}${num('Tiefe (m)','d',it.d,0.1,0.2)}</div><div class="row">${num('Höhe (m)','h',it.h,0.1,0.1)}${num('Drehung (°)','rot',it.rot||0,5,-360)}</div>`;
       h+=`<label class="field">Farbe<input type="color" data-k="color" value="${it.color||c.color}"></label>`;
     }
+    if(it.bestand) h+=`<div class="readout">Automatisch erkannter Bestand. Prüfe Lage und Größe am Luftbild.</div>`;
     h+=`<div class="btnrow"><button class="btn secondary" id="pDup">Duplizieren</button><button class="btn danger" id="pDel">Löschen</button></div>`;
     if(it.pts && sel.vtx!=null && it.pts[sel.vtx]) h+=`<button class="btn secondary" id="pVtxDel">Markierten Punkt ${sel.vtx+1} löschen</button>`;
     if(it.pts) h+=`<p class="hint" style="font-size:12px;color:var(--muted);margin:0">Punkte ziehen zum Ändern · kleine Punkte auf den Kanten ziehen fügt Punkte hinzu · Punkt antippen und „Punkt löschen“ entfernt ihn.</p>`;
@@ -1364,6 +1370,9 @@ function renderProps(){
   if(h){ setPropsBody(P,h); wireToolOpts(); return; }
   // Übersicht
   h+=`<h3>Übersicht</h3>`;
+  const hasB=state.items.some(i=>i.bestand);
+  h+=`<button class="btn ${hasB?'secondary':''}" id="pDetect">${hasB?'🔍 Bestand neu erkennen':'🔍 Bestand automatisch einzeichnen'}</button>`;
+  h+=`<p class="hint" style="font-size:12px;color:var(--muted);margin:0;line-height:1.45">Bäume, Sträucher, Hecken, Schuppen, Rasen und Pflaster werden aus dem amtlichen Höhenmodell (Laserscan, 25 cm) und dem Infrarot-Luftbild erkannt. Prüfe und korrigiere das Ergebnis, die Erkennung ist eine Näherung.</p>`;
   for(const p of state.parcels) h+=`<div class="stat"><span>${esc(p.label)}</span><span>${Number(p.props.flaeche||0).toLocaleString('de-DE')} m²</span></div>`;
   const area={}; for(const it of state.items){
     if(it.type==='area'){ area[it.mat]=(area[it.mat]||0)+ringArea(it.pts); }
@@ -1376,6 +1385,7 @@ function renderProps(){
   if(Object.keys(plants).length){ h+=`<h4>Pflanzenliste</h4>`; for(const [k,v] of Object.entries(plants).sort()) h+=`<div class="stat"><span>${esc(k)}</span><span>${v}×</span></div>`; }
   const objs={}; for(const it of state.items) if(it.type==='object'){ const n=it.name||OBJECTS[it.kind].name; objs[n]=(objs[n]||0)+1; }
   if(Object.keys(objs).length){ h+=`<h4>Objekte</h4>`; for(const [k,v] of Object.entries(objs).sort()) h+=`<div class="stat"><span>${esc(k)}</span><span>${v}×</span></div>`; }
+  setTimeout(()=>$('#pDetect')?.addEventListener('click',()=>runDetection(true)),0);
   if(!state.items.length) h+=`<p class="hint" style="font-size:13px;color:var(--muted);margin:0;line-height:1.5">Wähle ein Werkzeug:<br><b>Weg</b> – Wege mit Breite und Belag<br><b>Fläche</b> – Rasen, Beete, Terrasse, Teich …<br><b>Hecke/Zaun</b> – Hecken, Zäune, Mauern<br><b>Pflanze</b> / <b>Objekt</b> – aus dem Katalog setzen<br><br>Zoomen: Mausrad oder zwei Finger. Verschieben: Rechtsklick + Ziehen oder mit einem Finger wischen.</p>`;
   setPropsBody(P,h);
 }
@@ -1418,6 +1428,223 @@ async function exportPlanPNG(){
   }catch(e){ toast('Export fehlgeschlagen: '+e.message); }
 }
 function download(href,name){ const a=document.createElement('a'); a.href=href; a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
+
+/* =====================================================================
+   Bestandserkennung: Höhenmodell (nDOM, 25 cm) + Infrarot-Luftbild (CIR)
+   – Bäume, Sträucher, Hecken, Schuppen, Rasen und befestigte Flächen
+   ===================================================================== */
+const HOEHE_WMS='https://geodienste.sachsen.de/wms_geosn_hoehe/guest';
+const CIR_WMS ='https://geodienste.sachsen.de/wms_geosn_dop-cir/guest';
+// Farbskala der nDOM-Darstellung → Höhe in m (aus Legende, geeicht über Sachdatenabfragen)
+const NDOM_RAMP=[[196,85,57,15],[196,85,57,15],[196,85,57,14.84],[196,85,57,14.68],[197,88,56,14.52],[199,91,54,14.36],[201,95,53,14.2],[203,98,51,14.05],[205,102,49,13.89],[206,106,48,13.73],[208,109,46,13.57],[210,113,44,13.41],[212,117,43,13.25],[214,120,41,13.09],[216,124,39,12.93],[217,128,38,12.77],[219,132,36,12.61],[221,135,34,12.45],[223,139,33,12.3],[225,142,31,12.14],[227,146,29,11.98],[228,150,28,11.82],[230,153,26,11.66],[232,157,24,11.5],[234,161,23,11.37],[236,164,21,11.24],[238,168,19,11.11],[239,172,18,10.99],[240,175,17,10.86],[241,178,16,10.73],[241,182,15,10.6],[241,185,14,10.47],[242,188,14,10.34],[242,191,13,10.21],[242,194,12,10.09],[242,198,12,9.96],[243,201,11,9.83],[243,204,10,9.7],[243,207,10,9.6],[244,210,9,9.5],[244,214,8,9.4],[244,217,8,9.3],[245,220,7,9.2],[245,223,6,9.1],[245,226,6,9.0],[246,230,5,8.9],[246,233,4,8.8],[246,236,3,8.7],[247,239,3,8.6],[247,242,2,8.5],[247,246,1,8.35],[248,249,1,8.2],[248,252,0,8.05],[234,250,0,7.9],[220,248,0,7.75],[206,246,0,7.6],[191,244,0,7.45],[177,242,0,7.3],[164,241,0,7.17],[150,239,0,7.03],[135,237,0,6.9],[121,235,0,6.77],[107,233,0,6.63],[93,231,0,6.5],[79,229,0,6.38],[65,227,0,6.25],[51,225,0,6.12],[37,223,0,6.0],[23,222,0,5.88],[9,220,0,5.75],[5,218,4,5.62],[6,215,9,5.5],[7,213,15,5.33],[8,211,20,5.16],[9,209,26,4.99],[10,207,31,4.82],[11,205,37,4.65],[12,203,42,4.48],[13,201,48,4.31],[14,199,53,4.14],[15,196,59,3.97],[16,194,64,3.8],[17,192,70,3.7],[18,190,75,3.6],[19,188,81,3.5],[20,186,86,3.4],[21,184,92,3.3],[22,182,97,3.2],[22,179,101,3.1],[22,177,103,3.0],[23,174,105,2.91],[23,171,108,2.83],[23,168,110,2.74],[23,166,112,2.65],[23,163,115,2.56],[24,160,117,2.47],[24,158,119,2.39],[24,155,122,2.3],[24,152,124,2.14],[24,150,126,1.97],[25,147,129,1.81],[25,144,131,1.65],[25,142,134,1.49],[25,139,136,1.32],[26,136,138,1.16],[26,134,141,1.0],[26,131,143,0.92],[26,130,143,0.83],[25,127,142,0.75],[25,125,142,0.67],[24,122,141,0.58],[24,119,140,0.5],[23,116,139,0.4],[23,112,139,0.3],[22,109,138,0.2],[22,105,137,0.1],[21,101,136,0.05],[20,97,135,0.0],[20,93,134,-0.12],[19,89,133,-0.23],[18,85,132,-0.35],[17,80,131,-0.47],[17,76,130,-0.58],[16,71,129,-0.7],[15,67,127,-0.92],[14,62,126,-1.13],[13,57,125,-1.35],[12,52,124,-1.57],[12,47,123,-1.78],[11,44,122,-2.0]];
+const rampCache=new Map();
+function ndomHeight(r,g,b){
+  const key=(r>>2)<<12|(g>>2)<<6|(b>>2);
+  let v=rampCache.get(key); if(v!==undefined) return v;
+  let best=1e9; v=0;
+  for(const c of NDOM_RAMP){ const d=(c[0]-r)**2+(c[1]-g)**2+(c[2]-b)**2; if(d<best){ best=d; v=c[3]; } }
+  if(best>2500) v=0; // keine Daten / Hintergrund
+  rampCache.set(key,v); return v;
+}
+function wmsUrl(base, layer, s,w,n,e, W,H, fmt='image/png'){
+  return base+'?'+new URLSearchParams({ SERVICE:'WMS', VERSION:'1.3.0', REQUEST:'GetMap', LAYERS:layer, STYLES:'',
+    CRS:'EPSG:4326', BBOX:`${s},${w},${n},${e}`, WIDTH:String(W), HEIGHT:String(H), FORMAT:fmt });
+}
+async function loadPixels(url,W,H){
+  const img=new Image(); img.crossOrigin='anonymous'; img.src=url;
+  await img.decode();
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
+  const g=c.getContext('2d',{ willReadFrequently:true }); g.imageSmoothingEnabled=false; g.drawImage(img,0,0,W,H);
+  return g.getImageData(0,0,W,H).data;
+}
+// Polygone (lokale Meter) in ein Raster zeichnen → Maske
+function rasterMask(polys, grid, buffer=0){
+  const c=document.createElement('canvas'); c.width=grid.W; c.height=grid.H;
+  const g=c.getContext('2d'); g.fillStyle='#fff'; g.strokeStyle='#fff'; g.lineJoin='round'; g.lineWidth=buffer*2/grid.res;
+  for(const rings of polys){
+    g.beginPath();
+    for(const r of rings){ r.forEach(([x,y],i)=>{ const px_=(x-grid.x0)/grid.res, py_=(y-grid.y0)/grid.res; i?g.lineTo(px_,py_):g.moveTo(px_,py_); }); g.closePath(); }
+    g.fill('evenodd'); if(buffer>0) g.stroke();
+  }
+  const d=g.getImageData(0,0,grid.W,grid.H).data; const m=new Uint8Array(grid.W*grid.H);
+  for(let i=0;i<m.length;i++) m[i]=d[i*4+3]>127?1:0;
+  return m;
+}
+// Zusammenhängende Bereiche (8er-Nachbarschaft)
+function components(mask,W,H){
+  const lab=new Int32Array(W*H).fill(-1); const comps=[]; const st=[];
+  for(let i=0;i<W*H;i++){ if(!mask[i]||lab[i]>=0) continue;
+    const id=comps.length, px_=[]; lab[i]=id; st.push(i);
+    while(st.length){ const k=st.pop(); px_.push(k); const x=k%W, y=(k/W)|0;
+      for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){ if(!dx&&!dy) continue; const nx=x+dx, ny=y+dy; if(nx<0||ny<0||nx>=W||ny>=H) continue; const n=ny*W+nx; if(mask[n]&&lab[n]<0){ lab[n]=id; st.push(n); } } }
+    comps.push(px_); }
+  return { lab, comps };
+}
+// Hauptachsen (PCA) eines Pixelhaufens → Länge, Breite, Richtung, Schwerpunkt (in Metern)
+function pca(px_, grid){
+  let sx=0, sy=0; const n=px_.length; for(const k of px_){ sx+=k%grid.W; sy+=(k/grid.W)|0; }
+  const mx=sx/n, my=sy/n; let a=0,b=0,c=0;
+  for(const k of px_){ const dx=k%grid.W-mx, dy=((k/grid.W)|0)-my; a+=dx*dx; b+=dx*dy; c+=dy*dy; }
+  a/=n; b/=n; c/=n; const t=Math.sqrt(((a-c)/2)**2+b*b); const l1=(a+c)/2+t, l2=Math.max(0,(a+c)/2-t);
+  const ang=Math.atan2(l1-a, b) ; // Richtung des größten Eigenwerts
+  const ux=Math.abs(b)>1e-9? b : (a>=c?1:0), uy=Math.abs(b)>1e-9? l1-a : (a>=c?0:1); const ul=Math.hypot(ux,uy)||1;
+  return { cx:grid.x0+(mx+0.5)*grid.res, cy:grid.y0+(my+0.5)*grid.res, L:Math.sqrt(12*l1)*grid.res+grid.res, Wd:Math.sqrt(12*l2)*grid.res+grid.res, ux:ux/ul, uy:uy/ul };
+}
+// Morphologie (Quadrat, Radius r)
+function morph(m,W,H,r,dilate){
+  const out=new Uint8Array(W*H), tmp=new Uint8Array(W*H);
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){ let v=dilate?0:1; for(let d=-r;d<=r;d++){ const nx=Math.min(W-1,Math.max(0,x+d)); const q=m[y*W+nx]; if(dilate? q : !q){ v=dilate?1:0; break; } } tmp[y*W+x]=v; }
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){ let v=dilate?0:1; for(let d=-r;d<=r;d++){ const ny=Math.min(H-1,Math.max(0,y+d)); const q=tmp[ny*W+x]; if(dilate? q : !q){ v=dilate?1:0; break; } } out[y*W+x]=v; }
+  return out;
+}
+// Außenkontur eines Bereichs über Pixelkanten verfolgen → Polygon in Metern
+function traceOutline(px_, lab, id, grid){
+  const W=grid.W, H=grid.H; const inC=(x,y)=> x>=0&&y>=0&&x<W&&y<H&&lab[y*W+x]===id;
+  const next=new Map(); const key=(x,y)=>x*100000+y;
+  const add=(x1,y1,x2,y2)=>{ const k=key(x1,y1); (next.get(k)||next.set(k,[]).get(k)).push([x2,y2]); };
+  for(const k of px_){ const x=k%W, y=(k/W)|0;
+    if(!inC(x,y-1)) add(x,y,x+1,y); if(!inC(x+1,y)) add(x+1,y,x+1,y+1);
+    if(!inC(x,y+1)) add(x+1,y+1,x,y+1); if(!inC(x-1,y)) add(x,y+1,x,y); }
+  let best=null;
+  const used=new Set();
+  for(const [k0,list] of next){ for(let li=0;li<list.length;li++){
+    const ek=k0+':'+li; if(used.has(ek)) continue;
+    const loop=[]; let cx=Math.floor(k0/100000), cy=k0%100000, guard=0; let ck=k0, ci=li;
+    while(guard++<200000){ const e=next.get(ck)[ci]; used.add(ck+':'+ci); loop.push([cx,cy]); cx=e[0]; cy=e[1]; ck=key(cx,cy);
+      const opts=next.get(ck); if(!opts) break; ci=opts.findIndex((_,j)=>!used.has(ck+':'+j)); if(ci<0) break; }
+    if(!best||loop.length>best.length) best=loop; } }
+  if(!best||best.length<4) return null;
+  return simplifyDP(best.map(([x,y])=>[grid.x0+x*grid.res, grid.y0+y*grid.res]), 0.35);
+}
+function simplifyDP(pts,tol){
+  if(pts.length<4) return pts;
+  const keep=new Uint8Array(pts.length); keep[0]=keep[pts.length-1]=1;
+  const st=[[0,pts.length-1]];
+  while(st.length){ const [a,b]=st.pop(); let md=0, mi=-1; for(let i=a+1;i<b;i++){ const d=distToSeg(pts[i],pts[a],pts[b]); if(d>md){ md=d; mi=i; } } if(md>tol){ keep[mi]=1; st.push([a,mi],[mi,b]); } }
+  const out=pts.filter((_,i)=>keep[i]); if(out.length>2 && Math.hypot(out[0][0]-out.at(-1)[0],out[0][1]-out.at(-1)[1])<1e-6) out.pop();
+  return out.length>=3? out : null;
+}
+function percentile(arr,p){ if(!arr.length) return 0; const a=Float32Array.from(arr).sort(); return a[Math.min(a.length-1,Math.floor(p*a.length))]; }
+
+async function detectBestand(onStep=()=>{}){
+  const A=state.aerial; if(!A) throw new Error('Kein Grundstück geladen');
+  const res=0.25;
+  let W=Math.round((A.x1-A.x0)/res), H=Math.round((A.y1-A.y0)/res);
+  const f=Math.min(1, 2000/Math.max(W,H)); W=Math.round(W*f); H=Math.round(H*f);
+  const grid={ x0:A.x0, y0:A.y0, W, H, res:(A.x1-A.x0)/W };
+  onStep('Lade Höhenmodell …');
+  const [hp, cp] = await Promise.all([
+    loadPixels(wmsUrl(HOEHE_WMS,'hoehendifferenz',A.s,A.w,A.n,A.e,W,H),W,H),
+    loadPixels(wmsUrl(CIR_WMS,'sn_dop_020_cir',A.s,A.w,A.n,A.e,W,H,'image/jpeg'),W,H) ]);
+  onStep('Werte aus …');
+  const N=W*H, Hm=new Float32Array(N), veg=new Uint8Array(N);
+  for(let i=0;i<N;i++){
+    Hm[i]=ndomHeight(hp[i*4],hp[i*4+1],hp[i*4+2]);
+    const nir=cp[i*4], red=cp[i*4+1], bright=cp[i*4]+cp[i*4+1]+cp[i*4+2];
+    const ndvi=(nir-red)/(nir+red+1);
+    veg[i]= ndvi>0.1 || (bright<170 && ndvi>-0.02) ? 1 : 0;   // im Schatten großzügiger
+  }
+  const parcelM=rasterMask(state.parcels.flatMap(p=>p.polys), grid, 0);
+  const buildM=rasterMask(state.buildings.flatMap(b=>b.polys), grid, 0.8);
+  const valid=new Uint8Array(N); for(let i=0;i<N;i++) valid[i]=parcelM[i]&&!buildM[i]?1:0;
+  const items=[]; const pxA=grid.res*grid.res;
+
+  // Gebäudehöhen für die 3D-Ansicht
+  for(const b of state.buildings){
+    const m=morph(rasterMask(b.polys,grid,0),W,H,2,false); const hs=[];   // 50 cm nach innen, damit Bäume am Rand nicht mitzählen
+    for(let i=0;i<N;i++) if(m[i]&&Hm[i]>0.5) hs.push(Hm[i]);
+    if(hs.length>8){ b.hEave=Math.max(2,percentile(hs,0.2)); b.hRidge=Math.max(b.hEave,percentile(hs,0.9)); }
+  }
+
+  // 1) Bäume: Höhe ≥ 3 m (keine flachen Dächer)
+  onStep('Erkenne Bäume …');
+  const tall=new Uint8Array(N); for(let i=0;i<N;i++) tall[i]=valid[i]&&Hm[i]>=3?1:0;
+  const T=components(tall,W,H);
+  const used=new Uint8Array(N);
+  for(let ci=0;ci<T.comps.length;ci++){
+    const px_=T.comps[ci]; if(px_.length*pxA<1.5) continue;
+    const hs=px_.map(k=>Hm[k]); const mean=hs.reduce((a,b)=>a+b,0)/hs.length;
+    const sd=Math.sqrt(hs.reduce((a,b)=>a+(b-mean)**2,0)/hs.length);
+    const vegF=px_.reduce((a,k)=>a+veg[k],0)/px_.length;
+    if(sd<0.45 && vegF<0.35 && px_.length*pxA>4){ // glatt und nicht grün → Bauwerk, das nicht im Kataster ist
+      const p=pca(px_,grid); px_.forEach(k=>used[k]=1);
+      items.push({ id:uid(), type:'object', kind:'gartenhaus', bestand:true, name:'Nebengebäude (Bestand)', x:p.cx, y:p.cy, w:Math.round(p.L*10)/10, d:Math.round(p.Wd*10)/10, h:Math.round(percentile(hs,0.9)*10)/10, rot:Math.round(Math.atan2(p.uy,p.ux)*180/Math.PI), color:'#a58c72' });
+      continue;
+    }
+    // Kronenspitzen: lokale Maxima (Radius ~1,5 m)
+    const seeds=[];
+    for(const k of px_){ const x=k%W, y=(k/W)|0, h=Hm[k]; let isMax=true;
+      const r=Math.round(Math.min(4,Math.max(1.5,0.2*h+0.8))/grid.res);
+      for(let dy=-r;dy<=r&&isMax;dy++) for(let dx=-r;dx<=r;dx++){ if(dx*dx+dy*dy>r*r) continue; const nx=x+dx, ny=y+dy; if(nx<0||ny<0||nx>=W||ny>=H) continue; const n=ny*W+nx; if(T.lab[n]===ci && Hm[n]>h){ isMax=false; break; } }
+      if(isMax && !seeds.some(s=>Math.hypot(s.x-x,s.y-y)<r*1.2)) seeds.push({x,y,h,px:[]}); }
+    seeds.sort((a,b)=>b.h-a.h);
+    if(!seeds.length) continue;
+    for(const k of px_){ const x=k%W, y=(k/W)|0; let bs=seeds[0], bd=1e9; for(const s of seeds){ const d=Math.hypot(s.x-x,s.y-y)/Math.sqrt(s.h); if(d<bd){ bd=d; bs=s; } } bs.px.push(k); }
+    for(const s of seeds){
+      const area=s.px.length*pxA; if(area<1.2) continue; s.px.forEach(k=>used[k]=1);
+      let sx=0, sy=0; for(const k of s.px){ sx+=k%W; sy+=(k/W)|0; }
+      const cx=grid.x0+(sx/s.px.length+0.5)*grid.res, cy=grid.y0+(sy/s.px.length+0.5)*grid.res;
+      const d=Math.min(25,Math.max(1.5,2*Math.sqrt(area/Math.PI))), h=Math.round(s.h*10)/10;
+      const kind = d/h<0.28 ? (h>6?'tanne':'thuja') : (h<5?'zierbaum':'laubbaum');
+      items.push({ id:uid(), type:'plant', kind, bestand:true, name:(kind==='tanne'||kind==='thuja'?'Nadelbaum':'Baum')+' (Bestand)', x:Math.round(cx*10)/10, y:Math.round(cy*10)/10, d:Math.round(d*10)/10, h });
+    }
+  }
+
+  // 2) Sträucher, Hecken, kleine Bauwerke: 0,5–3 m
+  onStep('Erkenne Sträucher und Hecken …');
+  const mid=new Uint8Array(N); for(let i=0;i<N;i++) mid[i]=valid[i]&&!used[i]&&Hm[i]>=0.5&&Hm[i]<3?1:0;
+  const M=components(mid,W,H);
+  for(const px_ of M.comps){
+    const area=px_.length*pxA; if(area<0.6) continue;
+    const hs=px_.map(k=>Hm[k]); const h=Math.round(percentile(hs,0.9)*10)/10;
+    const vegF=px_.reduce((a,k)=>a+veg[k],0)/px_.length; const p=pca(px_,grid);
+    if(vegF<0.4){ // nicht grün: Schuppen/Carport (Autos < 2 m werden ignoriert)
+      const fill=area/(p.L*p.Wd);
+      if(h>=2 && area>=4 && area<=60 && fill>0.6 && p.Wd>=1.2) items.push({ id:uid(), type:'object', kind:'gartenhaus', bestand:true, name:'Schuppen (Bestand)', x:p.cx, y:p.cy, w:Math.round(p.L*10)/10, d:Math.round(p.Wd*10)/10, h, rot:Math.round(Math.atan2(p.uy,p.ux)*180/Math.PI), color:'#a58c72' });
+      continue;
+    }
+    if(p.L>=4 && p.L/p.Wd>=2.6){ // langgezogen → Hecke
+      const hl=p.L/2-p.Wd/2;
+      items.push({ id:uid(), type:'line', kind:'hecke', bestand:true, w:Math.round(Math.min(2.5,Math.max(0.4,p.Wd))*10)/10, h:Math.max(0.6,h), color:'#4e7f3a',
+        pts:[[p.cx-p.ux*hl,p.cy-p.uy*hl],[p.cx+p.ux*hl,p.cy+p.uy*hl]].map(q=>q.map(v=>Math.round(v*10)/10)) });
+    } else if(area>14){ // große Gruppe → mehrere Sträucher
+      const n=Math.min(8,Math.round(area/6)); const step=p.L/n;
+      for(let j=0;j<n;j++){ const t=-p.L/2+step*(j+0.5); items.push({ id:uid(), type:'plant', kind:'strauch', bestand:true, name:'Strauch (Bestand)', x:Math.round((p.cx+p.ux*t)*10)/10, y:Math.round((p.cy+p.uy*t)*10)/10, d:Math.round(Math.max(1,Math.min(p.Wd,step*1.3))*10)/10, h }); }
+    } else {
+      items.push({ id:uid(), type:'plant', kind:'strauch', bestand:true, name:'Strauch (Bestand)', x:Math.round(p.cx*10)/10, y:Math.round(p.cy*10)/10, d:Math.round(Math.max(0.6,2*Math.sqrt(area/Math.PI))*10)/10, h });
+    }
+  }
+
+  // 3) Bodenflächen: Rasen und befestigte Flächen (Einfahrt, Wege, Terrasse)
+  onStep('Erkenne Rasen und Pflaster …');
+  let paved=new Uint8Array(N), lawn=new Uint8Array(N);
+  for(let i=0;i<N;i++){ if(!valid[i]) continue; if(Hm[i]<0.5 && !veg[i]) paved[i]=1; else if(!(Hm[i]>=0.5&&Hm[i]<3&&!veg[i])) lawn[i]=1; }
+  paved=morph(morph(paved,W,H,2,false),W,H,2,true);   // Öffnen: Rauschen weg
+  lawn=morph(morph(lawn,W,H,2,true),W,H,2,false);     // Schließen: Lücken zu
+  for(let i=0;i<N;i++) if(paved[i]) lawn[i]=0;
+  const addAreas=(mask,mat,minA)=>{ const C=components(mask,W,H); C.comps.forEach((px_,id)=>{ if(px_.length*pxA<minA) return;
+    const poly=traceOutline(px_,C.lab,id,grid); if(poly && ringArea(poly)>=minA) items.push({ id:uid(), type:'area', mat, bestand:true, pts:poly.map(q=>q.map(v=>Math.round(v*100)/100)) }); }); };
+  addAreas(lawn,'rasen',6);
+  addAreas(paved,'pflaster',3);
+  return items;
+}
+async function runDetection(ask=true){
+  if(!state.origin) return;
+  const had=state.items.some(i=>i.bestand);
+  if(ask && had && !confirm('Den erkannten Bestand neu einlesen? Bisher erkannte Bestand-Elemente werden ersetzt. Deine eigenen Planungen bleiben.')) return;
+  const btn=$('#pDetect'); if(btn) btn.disabled=true;
+  try{
+    const found=await detectBestand(m=>toast(m));
+    const before=snapshot();
+    const own=state.items.filter(i=>!i.bestand);
+    // Flächen zuerst (liegen unten), danach eigene Planung
+    state.items=[...found.filter(i=>i.type==='area'), ...own, ...found.filter(i=>i.type!=='area')];
+    commit(before); persist(); lastBuilt=null; renderAll();
+    const n=t=>found.filter(i=>i.type==='plant'&&(t?i.name.startsWith(t):true)).length;
+    toast(`Bestand eingezeichnet: ${n('Baum')+n('Nadelbaum')} Bäume, ${n('Strauch')} Sträucher, ${found.filter(i=>i.type==='line').length} Hecken, ${found.filter(i=>i.type==='area').length} Flächen`);
+  }catch(e){ toast('Erkennung fehlgeschlagen: '+e.message); console.error(e); }
+  if(btn) btn.disabled=false;
+}
 
 /* =====================================================================
    Schritt 3: 3D-Ansicht (Three.js) – x = Osten, z = Süden, y = oben
@@ -1679,20 +1906,23 @@ function line3D(it){
 /* ---------- Gebäude ---------- */
 function building3D(b){
   const low=/garage|schuppen|neben|carport|überdach|gartenhaus|laube|stall/i.test(b.funktion);
-  const wallH= low?2.8:6.2;
+  let wallH= b.hEave ?? (low?2.8:6.2);
+  const ridgeH = b.hRidge ?? null;
+  const flat = ridgeH!=null && ridgeH-wallH<0.8;
+  if(flat) wallH=ridgeH;
   const g=new THREE.Group(); const wall=col('#ece6da'), roofM=col(low?'#7a7570':'#9b5a45');
   for(const rings of b.polys){
     const outer=rings[0];
     // Rechteck? → Satteldach, sonst Flachdach
     const simp=simplifyRing(outer);
     g.add(extrudeMesh(rings,wall,wallH));
-    if(!low && simp.length===4 && rings.length===1){
+    if(!flat && (ridgeH!=null || !low) && simp.length===4 && rings.length===1){
       const [p0,p1,p2]=simp; const e1=Math.hypot(p1[0]-p0[0],p1[1]-p0[1]), e2=Math.hypot(p2[0]-p1[0],p2[1]-p1[1]);
       const longA = e1>=e2; const len=longA?e1:e2, wid=longA?e2:e1;
       const dir= longA? [p1[0]-p0[0],p1[1]-p0[1]] : [p2[0]-p1[0],p2[1]-p1[1]];
       const ang=Math.atan2(dir[1],dir[0]);
       const cx=simp.reduce((s,p)=>s+p[0],0)/4, cz=simp.reduce((s,p)=>s+p[1],0)/4;
-      const roof=gableRoof(len+0.6,wid+0.6,Math.min(wid*0.45,4.5),roofM); roof.position.set(cx,wallH,cz); roof.rotation.y=-ang; g.add(roof);
+      const roof=gableRoof(len+0.6,wid+0.6, Math.min(wid*0.6, ridgeH!=null? Math.max(0.8,ridgeH-wallH) : Math.min(wid*0.45,4.5)), roofM); roof.position.set(cx,wallH,cz); roof.rotation.y=-ang; g.add(roof);
     } else {
       g.add(flatMesh(rings, roofM, wallH+0.02));
     }
@@ -1721,14 +1951,16 @@ function build3D(){
   const groundMode=$('#v3ground').value;
   if(a){
     let mat;
-    if(groundMode==='aerial'){
+    if(groundMode!=='lawn'){
       const tex=new THREE.TextureLoader().setCrossOrigin('anonymous').load(aerialUrl(),()=>{});
       tex.colorSpace=THREE.SRGBColorSpace; tex.anisotropy=8;
       mat=new THREE.MeshStandardMaterial({ map:tex, roughness:1 });
     } else mat=surfaceMat('rasen');
     const pg=new THREE.PlaneGeometry(a.x1-a.x0,a.y1-a.y0); pg.rotateX(-Math.PI/2);
-    if(groundMode!=='aerial'){ const uv=pg.attributes.uv, p=pg.attributes.position; for(let i=0;i<uv.count;i++) uv.setXY(i,p.getX(i)+(a.x0+a.x1)/2,-(p.getZ(i)+(a.y0+a.y1)/2)); }
+    if(groundMode==='lawn'){ const uv=pg.attributes.uv, p=pg.attributes.position; for(let i=0;i<uv.count;i++) uv.setXY(i,p.getX(i)+(a.x0+a.x1)/2,-(p.getZ(i)+(a.y0+a.y1)/2)); }
     const gm=new THREE.Mesh(pg,mat); gm.position.set((a.x0+a.x1)/2,0,(a.y0+a.y1)/2); gm.receiveShadow=true; root.add(gm);
+    // „Gestaltet“: Grundstück als Rasen, damit nur die geplanten/erkannten Elemente zu sehen sind
+    if(groundMode==='design') for(const p of state.parcels) for(const rings of p.polys) root.add(flatMesh(rings, surfaceMat('rasen'), 0.008));
   }
   // Grundstücksgrenze
   for(const p of state.parcels) for(const rings of p.polys){

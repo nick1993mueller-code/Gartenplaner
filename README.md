@@ -48,9 +48,19 @@ Der Plan wird automatisch im Browser gespeichert. Mit „Speichern“ wird eine 
 
 Neue Punkte rasten an Ecken von Grundstück, Gebäuden und Elementen ein, sonst im 10-cm-Raster (abschaltbar mit „Einrasten“).
 
+## Bestand automatisch einzeichnen
+
+Nach „Grundstück übernehmen“ zeichnet die App den vorhandenen Garten automatisch ein. Über Plan → Übersicht → „Bestand neu erkennen“ lässt sich das wiederholen.
+
+- **Bäume** mit Kronendurchmesser und Höhe, **Sträucher**, **Hecken**, **Schuppen**, die nicht im Kataster stehen, sowie **Rasen** und **befestigte Flächen** (Einfahrt, Wege, Terrasse)
+- **Gebäudehöhen und Dächer** für die 3D-Ansicht
+
+Grundlage sind das normalisierte Oberflächenmodell (nDOM, Laserscan, 25 cm) und das Infrarot-Luftbild (CIR) von GeoSN. Die Erkennung ist eine Näherung. Erkannte Elemente tragen den Zusatz „(Bestand)“ und lassen sich wie alles andere verschieben, ändern oder löschen.
+
 ## Datenquellen
 
 - Flurstücke und Gebäude: ALKIS Sachsen (WFS „ALKIS vereinfacht“), © GeoSN, [dl-de/by-2-0](https://www.govdata.de/dl-de/by-2-0)
-- Luftbild: Digitale Orthophotos Sachsen, 20 cm, © GeoSN, dl-de/by-2-0
+- Luftbild: Digitale Orthophotos Sachsen (RGB und CIR), 20 cm, © GeoSN, dl-de/by-2-0
+- Höhen: Objekthöhe nDOM, © GeoSN, dl-de/by-2-0
 - Adresssuche: OpenStreetMap (Nominatim / Photon)
 - Optional: Google Satellit über die Google Map Tiles API. Den API-Schlüssel unter ⚙︎ eintragen. Die Ebene erscheint dann in Schritt 1.
